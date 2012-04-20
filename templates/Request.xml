@@ -1,0 +1,16 @@
+<xls:XLS version="1" xls:lang="en" xmlns:xls="http://www.opengis.net/xls" rel="{{ ddsVersion }}" xmlns:gml="http://www.opengis.net/gml">
+    <xls:RequestHeader 
+            clientName="{{ user }}" 
+            clientPassword="{{ apikey }}"
+            sessionID="{{ sessionId }}"
+            configuration="{{ mapConfig }}" />
+            
+    <xls:Request 
+            maximumResponses="{{ maxResponses }}" 
+            version="{{ version }}" 
+            requestID="{{ requestId }}" 
+            methodName="{{ requestName }}">
+
+        {{{ requestBody }}}
+    </xls:Request>
+</xls:XLS>

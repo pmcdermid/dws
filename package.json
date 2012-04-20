@@ -1,0 +1,35 @@
+{
+  "name": "anyroute",
+  "description": "A Spatial Routing Library designed to let you choose your Routing Provider",
+  "author": "Damon Oehlman <damon.oehlman@sidelab.com>",
+  "tags": [ "spatial", "gis", "mapping" ],
+  "version": "0.0.0",
+  "main": "pkg/cjs/matchme",
+  "engines": {
+    "node": ">= 0.4.x < 0.7.0"
+  },
+  "dependencies": {
+    "async": "0.1.x",
+    "superagent": "0.4.x",
+    "handlebars": "1.0.5beta",
+    "underscore": "1.3.x"
+  },
+
+  "devDependencies": {
+    "mocha": "1.x.x",
+    "expect.js": "*",
+    "rigger-collate": "0.2.x"
+  },
+
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/DamonOehlman/anyroute.git"
+  },
+  "bugs": {
+    "url": "http://github.com/DamonOehlman/anyroute/issues"
+  },
+  
+  "scripts": { "test": "mocha --reporter spec" },
+  
+  "contributors": []
+}

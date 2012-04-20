@@ -1,0 +1,11 @@
+<xls:DetermineRouteRequest
+    provideRouteHandle="{{ provideRouteHandle }}" 
+    distanceUnit="{{ distanceUnit }}" 
+    routeQueryType="{{ routeQueryType }}">
+    
+    <xls:RoutePlan>
+        <xls:RoutePreference>{{ routePreference }}</xls:RoutePreference>
+        <xls:WayPointList>{{{ waypoints }}}</xls:WayPointList>
+    </xls:RoutePlan>
+    
+</xls:DetermineRouteRequest>
