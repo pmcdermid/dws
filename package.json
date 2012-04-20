@@ -1,6 +1,6 @@
 {
-  "name": "anyroute",
-  "description": "A Spatial Routing Library designed to let you choose your Routing Provider",
+  "name": "dws",
+  "description": "Lightweight Wrapper for Decarta Hosted WebServices",
   "author": "Damon Oehlman <damon.oehlman@sidelab.com>",
   "tags": [ "spatial", "gis", "mapping" ],
   "version": "0.0.0",
