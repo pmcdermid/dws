@@ -1,4 +1,4 @@
-define('dws', ['superagent', 'handlebars', 'async', 'underscore'], function(superagent, handlebars, async, underscore) {
+define('dws', ['jsonget', 'handlebars', 'async', 'underscore'], function(jsonget, handlebars, async, underscore) {
   
   var _templates = {
     'DetermineRouteRequest': '<xls:DetermineRouteRequest provideRouteHandle="{{ provideRouteHandle }}" distanceUnit="{{ distanceUnit }}" routeQueryType="{{ routeQueryType }}"><xls:RoutePlan><xls:RoutePreference>{{ routePreference }}</xls:RoutePreference><xls:WayPointList>{{{ waypoints }}}</xls:WayPointList></xls:RoutePlan></xls:DetermineRouteRequest>',
@@ -14,6 +14,7 @@ define('dws', ['superagent', 'handlebars', 'async', 'underscore'], function(supe
       ddsCurrentVersion = '4.5.2',
       nextRequestId = 1,
       handshakeResponse,
+      reTrailingSlash = /\/$/,
       
       // initialise default option values
       defaultOpts = {
@@ -28,7 +29,10 @@ define('dws', ['superagent', 'handlebars', 'async', 'underscore'], function(supe
           sessionId: new Date().getTime(),
           
           // initialise the default dds version
-          ddsVersion: '4.5.2'
+          ddsVersion: '4.5.2',
+          
+          // initialise the default endpoint
+          endpoint: 'http://ws.decarta.com/openls'
       };
       
   // compile the resources
@@ -40,24 +44,46 @@ define('dws', ['superagent', 'handlebars', 'async', 'underscore'], function(supe
       _.extend(defaultOpts, opts);
   }
   
-  function createRequest(requestType, opts) {
+  function makeRequest(requestType, opts, callback) {
+      var data, xml, targetUrl;
+      
       // if we don't have a template for the specified request type, then throw an error
       if (typeof _templates[requestType] != 'function') {
           throw new Error('Cannot find a template for a "' + requestType + '" request.');
       }
       
+      // clone the options into request data
+      data = _.clone(opts);
+      
+      // initialise the request id
+      data.requestId = data.requestId || nextRequestId++;
+      
       // generate the inner content
-      opts.requestBody = _templates[requestType](opts);
+      data.requestBody = _templates[requestType](data);
+  
+      // create the xml request content
+      xml = _templates.Request(data);
+      
+      // initialise the targeturl
+      targetUrl = opts.endpoint.replace(reTrailingSlash, '') + 
+          '/JSON?responseFormat=JSON&chunkNo=1&numChunks=1' + 
+          '&reqID=' + data.requestId + '&data=' + escape(xml);
+          
+      // make the request
+      
       
       // now return the inner content wrapped in the standard request
       return _templates.Request(opts);
   }
   
   function handshake(opts, callback) {
-      // create the ruok request
-      var body = createRequest('RuokRequest', opts);
-      
-      console.log(body);
+      // if we have an existing handshake response, then trigger the callback
+      if (handshakeResponse) return callback(null, handshakeResponse);
+  
+      // make the ruokrequest
+      makeRequest('RuokRequest', opts, function(err, response) {
+          
+      });
   }
   
   /**
@@ -94,9 +120,6 @@ define('dws', ['superagent', 'handlebars', 'async', 'underscore'], function(supe
       // and fill in defaults where required
       opts = _.defaults(opts || {}, defaultOpts);
       
-      // initialise the request id
-      opts.requestId = opts.requestId || nextRequestId++;
-      
       // check handshake done
       handshake(opts, function(err, data) {
           // if we received an error, then fire the callback and return
@@ -109,7 +132,7 @@ define('dws', ['superagent', 'handlebars', 'async', 'underscore'], function(supe
   
   // expose the create request and handshake functions
   dws.configure = configure;
-  dws.createRequest = createRequest;
+  dws.makeRequest = makeRequest;
   dws.handshake = handshake;
   
   // include the other operations

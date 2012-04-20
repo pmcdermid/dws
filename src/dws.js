@@ -1,4 +1,4 @@
-// req: superagent, handlebars, async, underscore
+// req: jsonget, handlebars, async, underscore
 
 //=collate ../templates
 
@@ -9,6 +9,7 @@ var hbs = typeof Handlebars != 'undefined' ? Handlebars : handlebars,
     ddsCurrentVersion = '4.5.2',
     nextRequestId = 1,
     handshakeResponse,
+    reTrailingSlash = /\/$/,
     
     // initialise default option values
     defaultOpts = {
@@ -39,7 +40,7 @@ function configure(opts) {
 }
 
 function makeRequest(requestType, opts, callback) {
-    var data, xml;
+    var data, xml, targetUrl;
     
     // if we don't have a template for the specified request type, then throw an error
     if (typeof _templates[requestType] != 'function') {
@@ -49,13 +50,21 @@ function makeRequest(requestType, opts, callback) {
     // clone the options into request data
     data = _.clone(opts);
     
+    // initialise the request id
+    data.requestId = data.requestId || nextRequestId++;
+    
     // generate the inner content
     data.requestBody = _templates[requestType](data);
 
     // create the xml request content
     xml = _templates.Request(data);
     
-    // use superagent to make the request
+    // initialise the targeturl
+    targetUrl = opts.endpoint.replace(reTrailingSlash, '') + 
+        '/JSON?responseFormat=JSON&chunkNo=1&numChunks=1' + 
+        '&reqID=' + data.requestId + '&data=' + escape(xml);
+        
+    // make the request
     
     
     // now return the inner content wrapped in the standard request
@@ -67,12 +76,9 @@ function handshake(opts, callback) {
     if (handshakeResponse) return callback(null, handshakeResponse);
 
     // make the ruokrequest
-    
-    
-    // create the ruok request
-    var body = createRequest('RuokRequest', opts);
-    
-    console.log(body);
+    makeRequest('RuokRequest', opts, function(err, response) {
+        
+    });
 }
 
 /**
@@ -108,9 +114,6 @@ function dws(requestType, opts, callback) {
     // ensure we have been passed options
     // and fill in defaults where required
     opts = _.defaults(opts || {}, defaultOpts);
-    
-    // initialise the request id
-    opts.requestId = opts.requestId || nextRequestId++;
     
     // check handshake done
     handshake(opts, function(err, data) {
