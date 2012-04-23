@@ -10,6 +10,7 @@ var hbs = typeof Handlebars != 'undefined' ? Handlebars : handlebars,
     nextRequestId = 1,
     handshakeResponse,
     reTrailingSlash = /\/$/,
+    reCoreRequestName = /^(.*)Request$/i,
     
     // initialise default option values
     defaultOpts = {
@@ -27,7 +28,10 @@ var hbs = typeof Handlebars != 'undefined' ? Handlebars : handlebars,
         ddsVersion: '4.5.2',
         
         // initialise the default endpoint
-        endpoint: 'http://ws.decarta.com/openls'
+        endpoint: 'http://ws.decarta.com/openls',
+        
+        // routing defaults
+        rulesFile: 'maneuver-rules'
     };
     
 // compile the resources
@@ -39,8 +43,32 @@ function configure(opts) {
     _.extend(defaultOpts, opts);
 }
 
+function extractCoreResponse(requestType, response) {
+    var responseType = requestType.replace(reCoreRequestName, '$1Response'),
+        nodes = ['response', 'XLS', 'Response', responseType],
+        errNodes = ['response', 'XLS', 'ResponseHeader', 'ErrorList'],
+        realResponse = response, errResponse = response;
+        
+    // console.log(nodes);
+    // console.log(require('util').inspect(realResponse, false, Infinity, true));
+
+    while (realResponse && nodes.length) {
+        realResponse = realResponse[nodes.shift()];
+    }
+    
+    // if we don't have a real response, look for an error
+    if (! realResponse) {
+        while (errResponse && errNodes.length) {
+            errResponse = errResponse[errNodes.shift()];
+        }
+    }
+    
+    // console.log(require('util').inspect(response, false, Infinity, true));
+    return realResponse || new Error(errResponse.Error.message);
+}
+
 function makeRequest(requestType, opts, callback) {
-    var data, xml, targetUrl;
+    var args, data, xml, targetUrl, jsonOpts;
     
     // if we don't have a template for the specified request type, then throw an error
     if (typeof _templates[requestType] != 'function') {
@@ -54,21 +82,51 @@ function makeRequest(requestType, opts, callback) {
     data.requestId = data.requestId || nextRequestId++;
     
     // generate the inner content
+    data.requestName = requestType;
     data.requestBody = _templates[requestType](data);
 
     // create the xml request content
     xml = _templates.Request(data);
     
-    // initialise the targeturl
-    targetUrl = opts.endpoint.replace(reTrailingSlash, '') + 
-        '/JSON?responseFormat=JSON&chunkNo=1&numChunks=1' + 
-        '&reqID=' + data.requestId + '&data=' + escape(xml);
-        
+    // create the request args
+    args = {
+        reqID: data.requestId,
+        chunkNo: 1, 
+        numChunks: 1,
+        data: xml,
+        responseFormat: 'JSON'
+    };
+    
+    // specify jsonget opts
+    // the decarta API insists (incorrectly) on a callback so we have to give it one
+    jsonOpts = {
+        forceCallback: true
+    };
+    
     // make the request
-    
-    
-    // now return the inner content wrapped in the standard request
-    return _templates.Request(opts);
+    jsonget(
+        opts.endpoint.replace(reTrailingSlash, '') + '/JSON', 
+        args, 
+        jsonOpts, 
+        function(err, results) {
+            var coreResponse;
+            
+            // extract the core response
+            if (! err) {
+                coreResponse = extractCoreResponse(requestType, results);
+
+                // if we only extracted an error, then map the core response 
+                // to the error param and the core response back to the complete
+                // results
+                if (coreResponse instanceof Error) {
+                    err = coreResponse;
+                    coreResponse = results;
+                }
+            }
+            
+            callback(err, coreResponse);
+        }
+    );
 }
 
 function handshake(opts, callback) {
@@ -76,8 +134,13 @@ function handshake(opts, callback) {
     if (handshakeResponse) return callback(null, handshakeResponse);
 
     // make the ruokrequest
-    makeRequest('RuokRequest', opts, function(err, response) {
+    makeRequest('RUOKRequest', opts, function(err, response) {
+        // cache the handshake response
+        if (! err) {
+            handshakeResponse = response;
+        }
         
+        callback(err, response);
     });
 }
 
@@ -122,6 +185,9 @@ function dws(requestType, opts, callback) {
             callback(err);
             return;
         }
+        
+        // TODO: apply the handshake option tweaks
+        makeRequest(requestType, opts, callback);
     });
 }
 

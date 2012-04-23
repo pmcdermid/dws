@@ -12,6 +12,12 @@
 */
 dws.route = function(points, opts, callback) {
     var waypoints = '';
+
+    // remap args if required
+    if (typeof opts == 'function') {
+        callback = opts;
+        opts = {};
+    }
     
     // ensure we have options
     opts = opts || {};
@@ -24,15 +30,21 @@ dws.route = function(points, opts, callback) {
     // initialise the route preference option
     opts.routePreference = opts.routePreference || 'fastest';
     
+    // initialise instructions and route geometry to return true
+    opts.geometry = typeof opts.geometry == 'undefined' || opts.geometry;
+    
+    // initialise instruction defaults
+    opts.instructions = typeof opts.instructions == 'undefined' || opts.instructions;
+    
     // create the waypoint tags manually
     // only need to do this because of the StartPoint, EndPoint, ViaPoint tag names :/
     for (var ii = 0, count = points.length; ii < count; ii++) {
         // determine the appropriate tag to use for the waypoint
         // as to why this is required, who knows....
-        var tagName = (ii === 0 ? "StartPoint" : (ii === waypoints.length-1 ? "EndPoint" : "ViaPoint"));
+        var tagName = (ii === 0 ? "StartPoint" : (ii === count-1 ? "EndPoint" : "ViaPoint"));
         
         waypoints += '<xls:' + tagName + '><xls:Position><gml:Point><gml:pos>' + 
-            points[ii].lat + ', ' + points[ii].lon + 
+            points[ii].lat + ' ' + points[ii].lon + 
             '</gml:pos></gml:Point></xls:Position></xls:' + tagName + '>';
     }
     

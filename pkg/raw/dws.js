@@ -1,9 +1,9 @@
 // req: jsonget, handlebars, async, underscore
 
 var _templates = {
-  'DetermineRouteRequest': '<xls:DetermineRouteRequest provideRouteHandle="{{ provideRouteHandle }}" distanceUnit="{{ distanceUnit }}" routeQueryType="{{ routeQueryType }}"><xls:RoutePlan><xls:RoutePreference>{{ routePreference }}</xls:RoutePreference><xls:WayPointList>{{{ waypoints }}}</xls:WayPointList></xls:RoutePlan></xls:DetermineRouteRequest>',
+  'DetermineRouteRequest': '<xls:DetermineRouteRequest provideRouteHandle="{{ provideRouteHandle }}" distanceUnit="{{ distanceUnit }}" routeQueryType="{{ routeQueryType }}"><xls:RoutePlan><xls:RoutePreference>{{ routePreference }}</xls:RoutePreference><xls:WayPointList>{{{ waypoints }}}</xls:WayPointList></xls:RoutePlan>{{#if instructions}}<xls:RouteInstructionsRequest rules="{{ rulesFile }}" providePoint="true" />{{/if}}{{#if geometry}}<xls:RouteGeometryRequest />{{/if}}</xls:DetermineRouteRequest>',
   'Request': '<xls:XLS version="1" xls:lang="en" xmlns:xls="http://www.opengis.net/xls" rel="{{ ddsVersion }}" xmlns:gml="http://www.opengis.net/gml"><xls:RequestHeader clientName="{{ user }}" clientPassword="{{ apikey }}" sessionID="{{ sessionId }}" configuration="{{ mapConfig }}" /><xls:Request maximumResponses="{{ maxResponses }}" version="{{ version }}" requestID="{{ requestId }}" methodName="{{ requestName }}">{{{ requestBody }}}</xls:Request></xls:XLS>',
-  'RuokRequest': '<xls:RUOKRequest />'
+  'RUOKRequest': '<xls:RUOKRequest />'
 };
 
 
@@ -15,6 +15,7 @@ var hbs = typeof Handlebars != 'undefined' ? Handlebars : handlebars,
     nextRequestId = 1,
     handshakeResponse,
     reTrailingSlash = /\/$/,
+    reCoreRequestName = /^(.*)Request$/i,
     
     // initialise default option values
     defaultOpts = {
@@ -32,7 +33,10 @@ var hbs = typeof Handlebars != 'undefined' ? Handlebars : handlebars,
         ddsVersion: '4.5.2',
         
         // initialise the default endpoint
-        endpoint: 'http://ws.decarta.com/openls'
+        endpoint: 'http://ws.decarta.com/openls',
+        
+        // routing defaults
+        rulesFile: 'maneuver-rules'
     };
     
 // compile the resources
@@ -44,8 +48,32 @@ function configure(opts) {
     _.extend(defaultOpts, opts);
 }
 
+function extractCoreResponse(requestType, response) {
+    var responseType = requestType.replace(reCoreRequestName, '$1Response'),
+        nodes = ['response', 'XLS', 'Response', responseType],
+        errNodes = ['response', 'XLS', 'ResponseHeader', 'ErrorList'],
+        realResponse = response, errResponse = response;
+        
+    // console.log(nodes);
+    // console.log(require('util').inspect(realResponse, false, Infinity, true));
+
+    while (realResponse && nodes.length) {
+        realResponse = realResponse[nodes.shift()];
+    }
+    
+    // if we don't have a real response, look for an error
+    if (! realResponse) {
+        while (errResponse && errNodes.length) {
+            errResponse = errResponse[errNodes.shift()];
+        }
+    }
+    
+    // console.log(require('util').inspect(response, false, Infinity, true));
+    return realResponse || new Error(errResponse.Error.message);
+}
+
 function makeRequest(requestType, opts, callback) {
-    var data, xml, targetUrl;
+    var args, data, xml, targetUrl, jsonOpts;
     
     // if we don't have a template for the specified request type, then throw an error
     if (typeof _templates[requestType] != 'function') {
@@ -59,21 +87,53 @@ function makeRequest(requestType, opts, callback) {
     data.requestId = data.requestId || nextRequestId++;
     
     // generate the inner content
+    data.requestName = requestType;
     data.requestBody = _templates[requestType](data);
 
     // create the xml request content
     xml = _templates.Request(data);
     
-    // initialise the targeturl
-    targetUrl = opts.endpoint.replace(reTrailingSlash, '') + 
-        '/JSON?responseFormat=JSON&chunkNo=1&numChunks=1' + 
-        '&reqID=' + data.requestId + '&data=' + escape(xml);
-        
+    console.log(xml);
+    
+    // create the request args
+    args = {
+        reqID: data.requestId,
+        chunkNo: 1, 
+        numChunks: 1,
+        data: xml,
+        responseFormat: 'JSON'
+    };
+    
+    // specify jsonget opts
+    // the decarta API insists (incorrectly) on a callback so we have to give it one
+    jsonOpts = {
+        forceCallback: true
+    };
+    
     // make the request
-    
-    
-    // now return the inner content wrapped in the standard request
-    return _templates.Request(opts);
+    jsonget(
+        opts.endpoint.replace(reTrailingSlash, '') + '/JSON', 
+        args, 
+        jsonOpts, 
+        function(err, results) {
+            var coreResponse;
+            
+            // extract the core response
+            if (! err) {
+                coreResponse = extractCoreResponse(requestType, results);
+
+                // if we only extracted an error, then map the core response 
+                // to the error param and the core response back to the complete
+                // results
+                if (coreResponse instanceof Error) {
+                    err = coreResponse;
+                    coreResponse = results;
+                }
+            }
+            
+            callback(err, coreResponse);
+        }
+    );
 }
 
 function handshake(opts, callback) {
@@ -81,8 +141,13 @@ function handshake(opts, callback) {
     if (handshakeResponse) return callback(null, handshakeResponse);
 
     // make the ruokrequest
-    makeRequest('RuokRequest', opts, function(err, response) {
+    makeRequest('RUOKRequest', opts, function(err, response) {
+        // cache the handshake response
+        if (! err) {
+            handshakeResponse = response;
+        }
         
+        callback(err, response);
     });
 }
 
@@ -127,6 +192,9 @@ function dws(requestType, opts, callback) {
             callback(err);
             return;
         }
+        
+        // TODO: apply the handshake option tweaks
+        makeRequest(requestType, opts, callback);
     });
 }
 
@@ -150,6 +218,12 @@ dws.handshake = handshake;
 */
 dws.route = function(points, opts, callback) {
     var waypoints = '';
+
+    // remap args if required
+    if (typeof opts == 'function') {
+        callback = opts;
+        opts = {};
+    }
     
     // ensure we have options
     opts = opts || {};
@@ -162,15 +236,21 @@ dws.route = function(points, opts, callback) {
     // initialise the route preference option
     opts.routePreference = opts.routePreference || 'fastest';
     
+    // initialise instructions and route geometry to return true
+    opts.geometry = typeof opts.geometry == 'undefined' || opts.geometry;
+    
+    // initialise instruction defaults
+    opts.instructions = typeof opts.instructions == 'undefined' || opts.instructions;
+    
     // create the waypoint tags manually
     // only need to do this because of the StartPoint, EndPoint, ViaPoint tag names :/
     for (var ii = 0, count = points.length; ii < count; ii++) {
         // determine the appropriate tag to use for the waypoint
         // as to why this is required, who knows....
-        var tagName = (ii === 0 ? "StartPoint" : (ii === waypoints.length-1 ? "EndPoint" : "ViaPoint"));
+        var tagName = (ii === 0 ? "StartPoint" : (ii === count-1 ? "EndPoint" : "ViaPoint"));
         
         waypoints += '<xls:' + tagName + '><xls:Position><gml:Point><gml:pos>' + 
-            points[ii].lat + ', ' + points[ii].lon + 
+            points[ii].lat + ' ' + points[ii].lon + 
             '</gml:pos></gml:Point></xls:Position></xls:' + tagName + '>';
     }
     

@@ -8,4 +8,6 @@
         <xls:WayPointList>{{{ waypoints }}}</xls:WayPointList>
     </xls:RoutePlan>
     
+    {{#if instructions}}<xls:RouteInstructionsRequest rules="{{ rulesFile }}" providePoint="true" />{{/if}}
+    {{#if geometry}}<xls:RouteGeometryRequest />{{/if}}
 </xls:DetermineRouteRequest>
