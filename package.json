@@ -23,13 +23,13 @@
 
   "repository": {
     "type": "git",
-    "url": "git://github.com/DamonOehlman/anyroute.git"
+    "url": "git://github.com/DamonOehlman/dws.git"
   },
   "bugs": {
-    "url": "http://github.com/DamonOehlman/anyroute/issues"
+    "url": "http://github.com/DamonOehlman/dws/issues"
   },
   
-  "scripts": { "test": "mocha --reporter spec" },
+  "scripts": { "test": "mocha --reporter spec --timeout 15000" },
   
   "contributors": []
 }

@@ -8,9 +8,12 @@ describe('decarta routing engine tests', function() {
     
     it('should be able to calculate a route using two points', function(done) {
         dws.route(testdata.routes.bne2syd, function(err, route) {
-            // expect(err).to.not.be.ok();
+            expect(err).to.not.be.ok();
+            expect(route.RouteGeometry).to.be.ok();
+            expect(route.RouteInstructionsList).to.be.ok();
+            expect(route.RouteSummary).to.be.ok();
             
-            console.log(err, route);
+            // console.log(err, route);
             done(err);
         });
     });

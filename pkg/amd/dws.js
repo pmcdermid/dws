@@ -93,8 +93,6 @@ define('dws', ['jsonget', 'handlebars', 'async', 'underscore'], function(jsonget
       // create the xml request content
       xml = _templates.Request(data);
       
-      console.log(xml);
-      
       // create the request args
       args = {
           reqID: data.requestId,
