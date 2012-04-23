@@ -8,7 +8,7 @@
     "mapping"
   ],
   "version": "0.1.0",
-  "main": "pkg/cjs/matchme",
+  "main": "pkg/cjs/dws",
   "engines": {
     "node": ">= 0.4.x < 0.7.0"
   },
