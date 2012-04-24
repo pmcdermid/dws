@@ -13,7 +13,7 @@ var _templates = {
 
 // get the handlebars library
 var hbs = typeof Handlebars != 'undefined' ? Handlebars : handlebars,
-    _ = underscore,
+    _ = typeof window != 'undefined' ? window._ : underscore,
     sessionId = new Date().getTime(),
     ddsCurrentVersion = '4.5.2',
     nextRequestId = 1,

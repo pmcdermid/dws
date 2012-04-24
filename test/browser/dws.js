@@ -749,7 +749,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
 }());
 
 
-;//     Underscore.js 1.3.1
+;//     Underscore.js 1.3.3
 //     (c) 2009-2012 Jeremy Ashkenas, DocumentCloud Inc.
 //     Underscore is freely distributable under the MIT license.
 //     Portions of Underscore are inspired or borrowed from Prototype,
@@ -813,7 +813,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   }
 
   // Current version.
-  _.VERSION = '1.3.1';
+  _.VERSION = '1.3.3';
 
   // Collection Functions
   // --------------------
@@ -1036,8 +1036,8 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     return result;
   };
 
-  // Use a comparator function to figure out at what index an object should
-  // be inserted so as to maintain order. Uses binary search.
+  // Use a comparator function to figure out the smallest index at which
+  // an object should be inserted so as to maintain order. Uses binary search.
   _.sortedIndex = function(array, obj, iterator) {
     iterator || (iterator = _.identity);
     var low = 0, high = array.length;
@@ -1072,7 +1072,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     return (n != null) && !guard ? slice.call(array, 0, n) : array[0];
   };
 
-  // Returns everything but the last entry of the array. Especcialy useful on
+  // Returns everything but the last entry of the array. Especially useful on
   // the arguments object. Passing **n** will return all the values in
   // the array, excluding the last N. The **guard** check allows it to work with
   // `_.map`.
@@ -1429,7 +1429,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     return obj;
   };
 
-  // Internal recursive comparison function.
+  // Internal recursive comparison function for `isEqual`.
   function eq(a, b, stack) {
     // Identical objects are equal. `0 === -0`, but they aren't identical.
     // See the Harmony `egal` proposal: http://wiki.ecmascript.org/doku.php?id=harmony:egal.
@@ -1548,6 +1548,8 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   };
 
   // Is a given variable an arguments object?
+  // Define a fallback version of the method in browsers (ahem, IE), where
+  // there isn't any inspectable "Arguments" type.
   _.isArguments = function(obj) {
     return toString.call(obj) == '[object Arguments]';
   };
@@ -1608,7 +1610,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     return obj === void 0;
   };
 
-  // Has own property?
+  // Does an object have the given "own" property?
   _.has = function(obj, key) {
     return hasOwnProperty.call(obj, key);
   };
@@ -1635,7 +1637,13 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
 
   // Escape a string for HTML interpolation.
   _.escape = function(string) {
-    return (''+string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;').replace(/\//g,'&#x2F;');
+    return (''+string)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;')
+      .replace(/\//g,'&#x2F;');
   };
 
   // If the value of the named property is a function then invoke it;
@@ -1703,30 +1711,31 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   // Underscore templating handles arbitrary delimiters, preserves whitespace,
   // and correctly escapes quotes within interpolated code.
   _.template = function(text, data, settings) {
-    settings = _.extend(_.templateSettings, settings);
+    settings = _.defaults(settings || {}, _.templateSettings);
 
     // Compile the template source, taking care to escape characters that
     // cannot be included in a string literal and then unescape them in code
     // blocks.
-    var source = "__p.push('" + text
+    var source = "__p+='" + text
       .replace(escaper, function(match) {
         return '\\' + escapes[match];
       })
       .replace(settings.escape || noMatch, function(match, code) {
-        return "',\n_.escape(" + unescape(code) + "),\n'";
+        return "'+\n((__t=(" + unescape(code) + "))==null?'':_.escape(__t))+\n'";
       })
       .replace(settings.interpolate || noMatch, function(match, code) {
-        return "',\n" + unescape(code) + ",\n'";
+        return "'+\n((__t=(" + unescape(code) + "))==null?'':__t)+\n'";
       })
       .replace(settings.evaluate || noMatch, function(match, code) {
-        return "');\n" + unescape(code) + "\n;__p.push('";
-      }) + "');\n";
+        return "';\n" + unescape(code) + "\n;__p+='";
+      }) + "';\n";
 
     // If a variable is not specified, place data values in local scope.
     if (!settings.variable) source = 'with(obj||{}){\n' + source + '}\n';
 
-    source = 'var __p=[],print=function(){__p.push.apply(__p,arguments);};\n' +
-      source + "return __p.join('');\n";
+    source = "var __t,__p='',__j=Array.prototype.join," +
+      "print=function(){__p+=__j.call(arguments,'')};\n" +
+      source + "return __p;\n";
 
     var render = new Function(settings.variable || 'obj', '_', source);
     if (data) return render(data, _);
@@ -1734,10 +1743,8 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
       return render.call(this, data, _);
     };
 
-    // Provide the compiled function source as a convenience for build time
-    // precompilation.
-    template.source = 'function(' + (settings.variable || 'obj') + '){\n' +
-      source + '\n}';
+    // Provide the compiled function source as a convenience for precompilation.
+    template.source = 'function(' + (settings.variable || 'obj') + '){\n' + source + '}';
 
     return template;
   };
@@ -1779,11 +1786,10 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   each(['pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift'], function(name) {
     var method = ArrayProto[name];
     wrapper.prototype[name] = function() {
-      var wrapped = this._wrapped;
-      method.apply(wrapped, arguments);
-      var length = wrapped.length;
-      if ((name == 'shift' || name == 'splice') && length === 0) delete wrapped[0];
-      return result(wrapped, this._chain);
+      var obj = this._wrapped;
+      method.apply(obj, arguments);
+      if ((name == 'shift' || name == 'splice') && obj.length === 0) delete obj[0];
+      return result(obj, this._chain);
     };
   });
 
@@ -2714,6 +2720,7 @@ var superagent = function(exports){
   
   var isBrowser = typeof window != 'undefined',
       callbackCounter = new Date().getTime(),
+      reStatusOK = /^(?:2|3)\d*$/,
       head;
       
   // TODO: make this work
@@ -2722,13 +2729,10 @@ var superagent = function(exports){
       
       return true;
   }
-      
-  function jsonp(url, data, callback, callbackParam) {
+  
+  function jsonp(url, data, opts, callback) {
       // create the url args
-      var args = [], 
-          script, 
-          fnName = typeof jsonget.fnName != 'undefined' ? jsonget.fnName : 'json' + (callbackCounter++),
-          done = false;
+      var args = [], script, done = false;
       
       // iterate through the data and create key value pairs
       for (var key in data) {
@@ -2736,7 +2740,7 @@ var superagent = function(exports){
       }
       
       // apply either a ? or & to the url depending on whether we already have query params
-      url += (url.indexOf('?') >= 0 ? '&' : '?') + (callbackParam ? callbackParam : 'callback') + '=' + fnName + '&';
+      url += (url.indexOf('?') >= 0 ? '&' : '?') + opts.cbParam + '=' + opts.fnname + '&';
       
       // if the callback function does not exist, then create it
       if (! window[fnName]) {
@@ -2777,20 +2781,80 @@ var superagent = function(exports){
       head.appendChild(script);
   }
   
-  function jsonget(url, data, callback) {
+  function makeRequest(url, data, opts, callback) {
+      // if we have the force callback param, clone the data and add a callback
+      if (opts.forceCallback) {
+          var clonedData = {};
+          
+          for (var key in data) {
+              clonedData[key] = data[key];
+          }
+          
+          data = clonedData;
+          data[opts.cbParam] = 'fakecb';
+      }
+      
+      superagent
+          .get(url)
+          .send(data)
+          .end(function(res) {
+              var err;
+              
+              // if the status code is not ok, then update the err
+              if (! reStatusOK.test(res.status)) {
+                  err = new Error('Not OK (status = ' + res.status + ')');
+              }
+              
+              // if we are in force callback mode, then extract the actual data
+              if ((!err) && opts.forceCallback) {
+                  var text = res.text.slice(res.text.indexOf('(') + 1, res.text.lastIndexOf(')'));
+  
+                  // attempt to parse the response body
+                  try {
+                      res.body = JSON.parse(text);
+                  }
+                  catch (e) {
+                      err = new Error('Unable to parse data using forced callback');
+                  }
+              }
+              
+              callback(err, res.body);
+          });
+  }
+  
+  /**
+  # jsonget
+  This is the main function of the jsonget helper and behind the scenes will
+  invoke either a JSONP style request or a standard XHR (or server-side) request
+  if acceptable.
+  
+  ## Valid Options
+  
+  - fnname:         The JSONP callback function name (default = json%counter%)
+  - cbParam:        The JSONP callback parameter passed to the JSONP compatible endpoint (default = callback)
+  - forceCallback:  Some (broken) webservices will only respond if a callback parameter is supplied.  Use this option if working with
+                    one of those services and you are doing server side integration in addition to browser.
+  
+  */
+  function jsonget(url, data, opts, callback) {
+      // remap args if required
+      if (typeof opts == 'function') {
+          callback = opts;
+          opts = {};
+      }
+      
+      // ensure we have options
+      opts = opts || {};
+      opts.fnname = opts.fnname || 'json' + (callbackCounter++);
+      opts.cbParam = opts.cbParam || 'callback';
+      
       // if jsonp is required, then used the script loader
       if (isBrowser && noCORS(url)) {
-          jsonp(url, data, callback);
+          jsonp(url, data, opts, callback);
       }
       // otherwise, use superagent
       else {
-          superagent
-              .get(url)
-              .send(data)
-              .end(function(res) {
-                  console.log(res.body);
-                  callback(null, res.body);
-              });
+          makeRequest(url, data, opts, callback);
       }
   }
   
@@ -2810,7 +2874,7 @@ var superagent = function(exports){
   
   // get the handlebars library
   var hbs = typeof Handlebars != 'undefined' ? Handlebars : handlebars,
-      _ = underscore,
+      _ = typeof window != 'undefined' ? window._ : underscore,
       sessionId = new Date().getTime(),
       ddsCurrentVersion = '4.5.2',
       nextRequestId = 1,
