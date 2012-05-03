@@ -39,6 +39,41 @@ for (var key in _templates) {
     _templates[key] = hbs.compile(_templates[key]);
 }
 
+function addressToXML(address, opts) {
+    var results = [],
+        parser = _templates.Address;
+        
+    // ensure we have opts
+    opts = opts || {};
+    
+    // default the opts
+    opts.country = opts.country || 'US';
+    opts.lang = opts.lang || 'EN';
+    
+    // if the address is not an array, then make it one
+    if (! Array.isArray(address)) {
+        address = [address];
+    }
+    
+    for (var ii = 0, count = address.length; ii < count; ii++) {
+        var data;
+        
+        // if the specified address is a string, then convert into a tmp object
+        if (typeof address[ii] == 'string' || (address[ii] instanceof String)) {
+            data = _.extend({}, opts, {
+                text: address[ii]
+            });
+        }
+        else {
+            data = _.extend({}, opts, address[ii]);
+        }
+        
+        results[ii] = parser(data);
+    }
+
+    return results;
+}
+
 function configure(opts) {
     _.extend(defaultOpts, opts);
 }
@@ -144,6 +179,10 @@ function handshake(opts, callback) {
     });
 }
 
+function template(name) {
+    return _templates[name];
+}
+
 /**
 # dws
 This is a JS frontend for the decarta routing engine via their WebServices
@@ -192,9 +231,11 @@ function dws(requestType, opts, callback) {
 }
 
 // expose the create request and handshake functions
+dws.addressToXML = addressToXML;
 dws.configure = configure;
 dws.makeRequest = makeRequest;
 dws.handshake = handshake;
+dws.template = template;
 
 // include the other operations
-//= operations/route
+//= operations

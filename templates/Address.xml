@@ -1,0 +1,13 @@
+<xls:Address countryCode="{{ country }}" language="{{ lang }}">
+    {{#if street}}
+        <xls:StreetAddress>
+            {{#if number}}<xls:Building number="{{ number }}"/>{{/if}}
+            <xls:Street>{{ street }}</xls:Street>
+        </xls:StreetAddress>
+        {{#each regions}}
+            <xls:Place>{{ this }}</xls:Place>
+        {{/each}}
+    {{else}}
+        <xls:freeFormAddress>{{ text }}</xls:freeFormAddress>
+    {{/if}}
+</xls:Address>

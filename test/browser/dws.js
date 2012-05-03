@@ -775,7 +775,8 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   var ArrayProto = Array.prototype, ObjProto = Object.prototype, FuncProto = Function.prototype;
 
   // Create quick reference variables for speed access to core prototypes.
-  var slice            = ArrayProto.slice,
+  var push             = ArrayProto.push,
+      slice            = ArrayProto.slice,
       unshift          = ArrayProto.unshift,
       toString         = ObjProto.toString,
       hasOwnProperty   = ObjProto.hasOwnProperty;
@@ -1040,10 +1041,11 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   // an object should be inserted so as to maintain order. Uses binary search.
   _.sortedIndex = function(array, obj, iterator) {
     iterator || (iterator = _.identity);
+    var value = iterator(obj);
     var low = 0, high = array.length;
     while (low < high) {
       var mid = (low + high) >> 1;
-      iterator(array[mid]) < iterator(obj) ? low = mid + 1 : high = mid;
+      iterator(array[mid]) < value ? low = mid + 1 : high = mid;
     }
     return low;
   };
@@ -1105,11 +1107,16 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
 
   // Return a completely flattened version of an array.
   _.flatten = function(array, shallow) {
-    return _.reduce(array, function(memo, value) {
-      if (_.isArray(value)) return memo.concat(shallow ? value : _.flatten(value));
-      memo[memo.length] = value;
-      return memo;
-    }, []);
+    return (function flatten(input, output) {
+      each(input, function(value) {
+        if (_.isArray(value)) {
+          shallow ? push.apply(output, value) : flatten(value, output);
+        } else {
+          output.push(value);
+        }
+      });
+      return output;
+    })(array, []);
   };
 
   // Return a version of the array that does not contain the specified value(s).
@@ -1125,7 +1132,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     var results = [];
     // The `isSorted` flag is irrelevant if the array only contains two elements.
     if (array.length < 3) isSorted = true;
-    _.reduce(initial, function (memo, value, index) {
+    _.reduce(initial, function(memo, value, index) {
       if (isSorted ? _.last(memo) !== value || !memo.length : !_.include(memo, value)) {
         memo.push(value);
         results.push(array[index]);
@@ -1291,10 +1298,10 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
       if (throttling) {
         more = true;
       } else {
+        throttling = true;
         result = func.apply(context, args);
       }
       whenDone();
-      throttling = true;
       return result;
     };
   };
@@ -1311,9 +1318,10 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
         timeout = null;
         if (!immediate) func.apply(context, args);
       };
-      if (immediate && !timeout) func.apply(context, args);
+      var callNow = immediate && !timeout;
       clearTimeout(timeout);
       timeout = setTimeout(later, wait);
+      if (callNow) func.apply(context, args);
     };
   };
 
@@ -1631,7 +1639,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   };
 
   // Run a function **n** times.
-  _.times = function (n, iterator, context) {
+  _.times = function(n, iterator, context) {
     for (var i = 0; i < n; i++) iterator.call(context, i);
   };
 
@@ -2866,7 +2874,9 @@ var superagent = function(exports){
 (function (glob) {
   
   var _templates = {
+    'Address': '<xls:Address countryCode="{{ country }}" language="{{ lang }}">{{#if street}}<xls:StreetAddress>{{#if number}}<xls:Building number="{{ number }}"/>{{/if}}<xls:Street>{{ street }}</xls:Street></xls:StreetAddress>{{#each regions}}<xls:Place>{{ this }}</xls:Place>{{/each}}{{else}}<xls:freeFormAddress>{{ text }}</xls:freeFormAddress>{{/if}}</xls:Address>',
     'DetermineRouteRequest': '<xls:DetermineRouteRequest provideRouteHandle="{{ provideRouteHandle }}" distanceUnit="{{ distanceUnit }}" routeQueryType="{{ routeQueryType }}"><xls:RoutePlan><xls:RoutePreference>{{ routePreference }}</xls:RoutePreference><xls:WayPointList>{{{ waypoints }}}</xls:WayPointList></xls:RoutePlan>{{#if instructions}}<xls:RouteInstructionsRequest rules="{{ rulesFile }}" providePoint="true" />{{/if}}{{#if geometry}}<xls:RouteGeometryRequest />{{/if}}</xls:DetermineRouteRequest>',
+    'GeocodeRequest': '<xls:GeocodeRequest>{{#each address}}{{{ this }}}{{/each}}</xls:GeocodeRequest>',
     'Request': '<xls:XLS version="1" xls:lang="en" xmlns:xls="http://www.opengis.net/xls" rel="{{ ddsVersion }}" xmlns:gml="http://www.opengis.net/gml"><xls:RequestHeader clientName="{{ user }}" clientPassword="{{ apikey }}" sessionID="{{ sessionId }}" configuration="{{ mapConfig }}" /><xls:Request maximumResponses="{{ maxResponses }}" version="{{ version }}" requestID="{{ requestId }}" methodName="{{ requestName }}">{{{ requestBody }}}</xls:Request></xls:XLS>',
     'RUOKRequest': '<xls:RUOKRequest />'
   };
@@ -2907,6 +2917,41 @@ var superagent = function(exports){
   // compile the resources
   for (var key in _templates) {
       _templates[key] = hbs.compile(_templates[key]);
+  }
+  
+  function addressToXML(address, opts) {
+      var results = [],
+          parser = _templates.Address;
+          
+      // ensure we have opts
+      opts = opts || {};
+      
+      // default the opts
+      opts.country = opts.country || 'US';
+      opts.lang = opts.lang || 'EN';
+      
+      // if the address is not an array, then make it one
+      if (! Array.isArray(address)) {
+          address = [address];
+      }
+      
+      for (var ii = 0, count = address.length; ii < count; ii++) {
+          var data;
+          
+          // if the specified address is a string, then convert into a tmp object
+          if (typeof address[ii] == 'string' || (address[ii] instanceof String)) {
+              data = _.extend({}, opts, {
+                  text: address[ii]
+              });
+          }
+          else {
+              data = _.extend({}, opts, address[ii]);
+          }
+          
+          results[ii] = parser(data);
+      }
+  
+      return results;
   }
   
   function configure(opts) {
@@ -3014,6 +3059,10 @@ var superagent = function(exports){
       });
   }
   
+  function template(name) {
+      return _templates[name];
+  }
+  
   /**
   # dws
   This is a JS frontend for the decarta routing engine via their WebServices
@@ -3062,11 +3111,48 @@ var superagent = function(exports){
   }
   
   // expose the create request and handshake functions
+  dws.addressToXML = addressToXML;
   dws.configure = configure;
   dws.makeRequest = makeRequest;
   dws.handshake = handshake;
+  dws.template = template;
   
   // include the other operations
+  /**
+  # dws.geocode(address, opts, callback)
+  
+  ## Configurable Options
+  
+  - provideRouteHandle:   Whether or not a route handle should be returned (default = false)
+  - distanceUnit:         Distance units (default = KM)
+  - routeQueryType:       The type of decarta routing request to make, RMAN, RTXT, etc (default = RMAN)
+  
+  - routePreference:      What type of routing algorithm to use, fastest, shortest, etc (default = fastest)
+  
+  */
+  dws.geocode = function(address, opts, callback) {
+      var waypoints = '';
+  
+      // remap args if required
+      if (typeof opts == 'function') {
+          callback = opts;
+          opts = {};
+      }
+      
+      // ensure we have options
+      opts = opts || {};
+      
+      // default the country and language
+      opts.country = opts.country || 'US';
+      opts.lang = opts.lang || 'EN';
+      
+      // create the address xml
+      opts.address = dws.addressToXML(address);
+      console.log(opts);
+  
+      // run the request
+      dws('DetermineRouteRequest', opts, callback);
+  };
   /**
   # dws.route(points, opts, callback)
   

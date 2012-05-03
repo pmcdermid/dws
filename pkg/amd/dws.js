@@ -1,7 +1,9 @@
 define('dws', ['jsonget', 'handlebars', 'async', 'underscore'], function(jsonget, handlebars, async, underscore) {
   
   var _templates = {
+    'Address': '<xls:Address countryCode="{{ country }}" language="{{ lang }}">{{#if street}}<xls:StreetAddress>{{#if number}}<xls:Building number="{{ number }}"/>{{/if}}<xls:Street>{{ street }}</xls:Street></xls:StreetAddress>{{#each regions}}<xls:Place>{{ this }}</xls:Place>{{/each}}{{else}}<xls:freeFormAddress>{{ text }}</xls:freeFormAddress>{{/if}}</xls:Address>',
     'DetermineRouteRequest': '<xls:DetermineRouteRequest provideRouteHandle="{{ provideRouteHandle }}" distanceUnit="{{ distanceUnit }}" routeQueryType="{{ routeQueryType }}"><xls:RoutePlan><xls:RoutePreference>{{ routePreference }}</xls:RoutePreference><xls:WayPointList>{{{ waypoints }}}</xls:WayPointList></xls:RoutePlan>{{#if instructions}}<xls:RouteInstructionsRequest rules="{{ rulesFile }}" providePoint="true" />{{/if}}{{#if geometry}}<xls:RouteGeometryRequest />{{/if}}</xls:DetermineRouteRequest>',
+    'GeocodeRequest': '<xls:GeocodeRequest>{{#each address}}{{{ this }}}{{/each}}</xls:GeocodeRequest>',
     'Request': '<xls:XLS version="1" xls:lang="en" xmlns:xls="http://www.opengis.net/xls" rel="{{ ddsVersion }}" xmlns:gml="http://www.opengis.net/gml"><xls:RequestHeader clientName="{{ user }}" clientPassword="{{ apikey }}" sessionID="{{ sessionId }}" configuration="{{ mapConfig }}" /><xls:Request maximumResponses="{{ maxResponses }}" version="{{ version }}" requestID="{{ requestId }}" methodName="{{ requestName }}">{{{ requestBody }}}</xls:Request></xls:XLS>',
     'RUOKRequest': '<xls:RUOKRequest />'
   };
@@ -42,6 +44,41 @@ define('dws', ['jsonget', 'handlebars', 'async', 'underscore'], function(jsonget
   // compile the resources
   for (var key in _templates) {
       _templates[key] = hbs.compile(_templates[key]);
+  }
+  
+  function addressToXML(address, opts) {
+      var results = [],
+          parser = _templates.Address;
+          
+      // ensure we have opts
+      opts = opts || {};
+      
+      // default the opts
+      opts.country = opts.country || 'US';
+      opts.lang = opts.lang || 'EN';
+      
+      // if the address is not an array, then make it one
+      if (! Array.isArray(address)) {
+          address = [address];
+      }
+      
+      for (var ii = 0, count = address.length; ii < count; ii++) {
+          var data;
+          
+          // if the specified address is a string, then convert into a tmp object
+          if (typeof address[ii] == 'string' || (address[ii] instanceof String)) {
+              data = _.extend({}, opts, {
+                  text: address[ii]
+              });
+          }
+          else {
+              data = _.extend({}, opts, address[ii]);
+          }
+          
+          results[ii] = parser(data);
+      }
+  
+      return results;
   }
   
   function configure(opts) {
@@ -149,6 +186,10 @@ define('dws', ['jsonget', 'handlebars', 'async', 'underscore'], function(jsonget
       });
   }
   
+  function template(name) {
+      return _templates[name];
+  }
+  
   /**
   # dws
   This is a JS frontend for the decarta routing engine via their WebServices
@@ -197,11 +238,48 @@ define('dws', ['jsonget', 'handlebars', 'async', 'underscore'], function(jsonget
   }
   
   // expose the create request and handshake functions
+  dws.addressToXML = addressToXML;
   dws.configure = configure;
   dws.makeRequest = makeRequest;
   dws.handshake = handshake;
+  dws.template = template;
   
   // include the other operations
+  /**
+  # dws.geocode(address, opts, callback)
+  
+  ## Configurable Options
+  
+  - provideRouteHandle:   Whether or not a route handle should be returned (default = false)
+  - distanceUnit:         Distance units (default = KM)
+  - routeQueryType:       The type of decarta routing request to make, RMAN, RTXT, etc (default = RMAN)
+  
+  - routePreference:      What type of routing algorithm to use, fastest, shortest, etc (default = fastest)
+  
+  */
+  dws.geocode = function(address, opts, callback) {
+      var waypoints = '';
+  
+      // remap args if required
+      if (typeof opts == 'function') {
+          callback = opts;
+          opts = {};
+      }
+      
+      // ensure we have options
+      opts = opts || {};
+      
+      // default the country and language
+      opts.country = opts.country || 'US';
+      opts.lang = opts.lang || 'EN';
+      
+      // create the address xml
+      opts.address = dws.addressToXML(address);
+      console.log(opts);
+  
+      // run the request
+      dws('DetermineRouteRequest', opts, callback);
+  };
   /**
   # dws.route(points, opts, callback)
   
