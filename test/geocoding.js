@@ -11,7 +11,10 @@ describe('decarta geocoding tests', function() {
         it('should be able to geocode: ' + address.type, function(done) {
             dws.geocode(address.input, function(err, results) {
                 expect(err).to.not.be.ok();
-                expect(results.GeocodeResponseList).to.be.ok();
+                expect(results.length).to.be.above(0);
+                expect(results[0].address).to.be.ok();
+                expect(results[0].pos).to.be.ok();
+                expect(results[0].address.toString()).to.not.equal('[object Object]');
                 
                 done(err);
             });

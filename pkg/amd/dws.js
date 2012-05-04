@@ -1,4 +1,4 @@
-define('dws', ['jsonget', 'handlebars', 'async', 'underscore'], function(jsonget, handlebars, async, underscore) {
+define('dws', ['debug', 'jsonget', 'handlebars', 'async', 'underscore'], function(debug, jsonget, handlebars, async, underscore) {
   
   var _templates = {
     'Address': '<xls:Address countryCode="{{ country }}" language="{{ lang }}">{{#if street}}<xls:StreetAddress>{{#if number}}<xls:Building number="{{ number }}"/>{{/if}}<xls:Street>{{ street }}</xls:Street></xls:StreetAddress>{{#each regions}}<xls:Place type="{{ type }}">{{ text }}</xls:Place>{{/each}}{{else}}<xls:freeFormAddress>{{ text }}</xls:freeFormAddress>{{/if}}</xls:Address>',
@@ -13,6 +13,7 @@ define('dws', ['jsonget', 'handlebars', 'async', 'underscore'], function(jsonget
   var hbs = typeof Handlebars != 'undefined' ? Handlebars : handlebars,
       _ = typeof window != 'undefined' ? window._ : underscore,
       sessionId = new Date().getTime(),
+      dbg = debug('dws'),
       ddsCurrentVersion = '4.5.2',
       nextRequestId = 1,
       handshakeResponse,
@@ -86,6 +87,11 @@ define('dws', ['jsonget', 'handlebars', 'async', 'underscore'], function(jsonget
           else {
               data = _.extend({}, opts, address[ii]);
               
+              // ensure country is provided
+              // we do this as the extend will always override the country member of opts using the address
+              // if it has been removed, then it needs to be replaced
+              data.country = data.country || opts.country;
+              
               // qualify regions
               (data.regions || []).forEach(qualifyRegion);
           }
@@ -144,6 +150,7 @@ define('dws', ['jsonget', 'handlebars', 'async', 'underscore'], function(jsonget
   
       // create the xml request content
       xml = _templates.Request(data);
+      dbg('sending request: ' + xml);
       
       // create the request args
       args = {
@@ -320,19 +327,115 @@ define('dws', ['jsonget', 'handlebars', 'async', 'underscore'], function(jsonget
           opts = {};
       }
       
-      // ensure we have options
-      opts = opts || {};
-      
-      // default the country and language
-      opts.country = opts.country || 'US';
-      opts.lang = opts.lang || 'EN';
-      
       // create the address xml
       opts.address = dws.addressToXML(address, opts);
   
       // run the request
-      dws('GeocodeRequest', opts, callback);
+      dws('GeocodeRequest', opts, function(err, response) {
+          // if we haven't received an error, make the response more consistent
+          if (! err) {
+              var results = (response.GeocodeResponseList || {}).GeocodedAddress || [];
+              
+              // if the response list is not an array, turn it into one
+              if (! Array.isArray(results)) {
+                  results = [results];
+              }
+              
+              // iterate through the results and normalize the decarta address into a standard format
+              results.forEach(function(result) {
+                  result.address = parseAddress(result.Address);
+                  result.pos = result.Point.pos;
+              });
+  
+              callback(err, results);
+          }
+          else {
+              callback(err);
+          }
+      });
   };
+  
+  function parseAddress(address, position) {
+      var streetDetails = parseStreet(address.StreetAddress),
+          regions = [];
+  
+      // iterate through the places
+      if (address.Place) {
+          if (! address.Place.length) {
+              address.Place = [address.Place];
+          } // if
+  
+          for (var ii = address.Place.length; ii--; ) {
+              regions[regions.length] = address.Place[ii].content;
+          } // for
+      } // if
+  
+      return {
+          building: streetDetails.building,
+          street: streetDetails.street,
+          regions: regions,
+          countryCode: address.countryCode || '',
+          postalCode: address.PostalCode || '',
+          
+          toString: function() {
+              return [streetDetails.toString()].concat(regions).join(', ');
+          }
+      };
+  } // parseAddress
+  
+  function parseStreet(streetAddress) {
+      // initialise variables
+      var street = "",
+          building = "";
+          
+      // ensure street address contains a value we can work with
+      streetAddress = streetAddress || {};
+          
+      // parse the street
+      if (streetAddress.Street) {
+          street = streetAddress.Street.content ? streetAddress.Street.content : streetAddress.Street;
+      } // if
+  
+      // strip any trailing highway specifiers from the street
+      street = (street && street.replace) ? street.replace(/\/\d+$/, "") : "";
+      
+      // parse the building
+      if (streetAddress.Building) {
+          // TODO: suspect name will be involved here possibly also
+          if (streetAddress.Building.number) {
+              building = streetAddress.Building.number;
+          } // if
+      } // if
+      
+      return {
+          building: building,
+          street: street,
+          
+          /*
+          calcMatchPercentage: function(input) {
+              var fnresult = 0,
+                  test1 = normalize(input), 
+                  test2 = normalize(street);
+                  
+              if (params.json.Building) {
+                  if (buildingMatch(input, params.json.Building.number.toString())) {
+                      fnresult += 0.2;
+                  } // if
+              } // if
+                  
+              if (test1 && test2 && T5.wordExists(test1, test2)) {
+                  fnresult += 0.8;
+              } // if
+  
+              return fnresult;
+          },
+          */
+          
+          toString: function() {
+              return (building ? building + ' ' : '') + street;
+          }
+      };
+  }
   /**
   # dws.route(points, opts, callback)
   

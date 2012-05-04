@@ -1,4 +1,4 @@
-// req: jsonget, handlebars, async, underscore
+// req: debug, jsonget, handlebars, async, underscore
 
 //=collate ../templates
 
@@ -6,6 +6,7 @@
 var hbs = typeof Handlebars != 'undefined' ? Handlebars : handlebars,
     _ = typeof window != 'undefined' ? window._ : underscore,
     sessionId = new Date().getTime(),
+    dbg = debug('dws'),
     ddsCurrentVersion = '4.5.2',
     nextRequestId = 1,
     handshakeResponse,
@@ -79,6 +80,11 @@ function addressToXML(address, opts) {
         else {
             data = _.extend({}, opts, address[ii]);
             
+            // ensure country is provided
+            // we do this as the extend will always override the country member of opts using the address
+            // if it has been removed, then it needs to be replaced
+            data.country = data.country || opts.country;
+            
             // qualify regions
             (data.regions || []).forEach(qualifyRegion);
         }
@@ -137,6 +143,7 @@ function makeRequest(requestType, opts, callback) {
 
     // create the xml request content
     xml = _templates.Request(data);
+    dbg('sending request: ' + xml);
     
     // create the request args
     args = {
