@@ -40,8 +40,17 @@ for (var key in _templates) {
 }
 
 function addressToXML(address, opts) {
-    var results = [],
-        parser = _templates.Address;
+    var data,
+        results = [],
+        parser = _templates.Address,
+        regionTypes = ['Municipality'];
+        
+    function qualifyRegion(region, idx) {
+        data.regions[idx] = {
+            text: region,
+            type: regionTypes[idx] || 'CountrySubdivision'
+        };
+    }
         
     // ensure we have opts
     opts = opts || {};
@@ -56,8 +65,6 @@ function addressToXML(address, opts) {
     }
     
     for (var ii = 0, count = address.length; ii < count; ii++) {
-        var data;
-        
         // if the specified address is a string, then convert into a tmp object
         if (typeof address[ii] == 'string' || (address[ii] instanceof String)) {
             data = _.extend({}, opts, {
@@ -66,6 +73,9 @@ function addressToXML(address, opts) {
         }
         else {
             data = _.extend({}, opts, address[ii]);
+            
+            // qualify regions
+            (data.regions || []).forEach(qualifyRegion);
         }
         
         results[ii] = parser(data);

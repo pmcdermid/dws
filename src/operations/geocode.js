@@ -27,9 +27,8 @@ dws.geocode = function(address, opts, callback) {
     opts.lang = opts.lang || 'EN';
     
     // create the address xml
-    opts.address = dws.addressToXML(address);
-    console.log(opts);
+    opts.address = dws.addressToXML(address, opts);
 
     // run the request
-    dws('DetermineRouteRequest', opts, callback);
+    dws('GeocodeRequest', opts, callback);
 };

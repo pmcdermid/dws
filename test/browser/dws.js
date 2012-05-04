@@ -2874,7 +2874,7 @@ var superagent = function(exports){
 (function (glob) {
   
   var _templates = {
-    'Address': '<xls:Address countryCode="{{ country }}" language="{{ lang }}">{{#if street}}<xls:StreetAddress>{{#if number}}<xls:Building number="{{ number }}"/>{{/if}}<xls:Street>{{ street }}</xls:Street></xls:StreetAddress>{{#each regions}}<xls:Place>{{ this }}</xls:Place>{{/each}}{{else}}<xls:freeFormAddress>{{ text }}</xls:freeFormAddress>{{/if}}</xls:Address>',
+    'Address': '<xls:Address countryCode="{{ country }}" language="{{ lang }}">{{#if street}}<xls:StreetAddress>{{#if number}}<xls:Building number="{{ number }}"/>{{/if}}<xls:Street>{{ street }}</xls:Street></xls:StreetAddress>{{#each regions}}<xls:Place type="{{ type }}">{{ text }}</xls:Place>{{/each}}{{else}}<xls:freeFormAddress>{{ text }}</xls:freeFormAddress>{{/if}}</xls:Address>',
     'DetermineRouteRequest': '<xls:DetermineRouteRequest provideRouteHandle="{{ provideRouteHandle }}" distanceUnit="{{ distanceUnit }}" routeQueryType="{{ routeQueryType }}"><xls:RoutePlan><xls:RoutePreference>{{ routePreference }}</xls:RoutePreference><xls:WayPointList>{{{ waypoints }}}</xls:WayPointList></xls:RoutePlan>{{#if instructions}}<xls:RouteInstructionsRequest rules="{{ rulesFile }}" providePoint="true" />{{/if}}{{#if geometry}}<xls:RouteGeometryRequest />{{/if}}</xls:DetermineRouteRequest>',
     'GeocodeRequest': '<xls:GeocodeRequest>{{#each address}}{{{ this }}}{{/each}}</xls:GeocodeRequest>',
     'Request': '<xls:XLS version="1" xls:lang="en" xmlns:xls="http://www.opengis.net/xls" rel="{{ ddsVersion }}" xmlns:gml="http://www.opengis.net/gml"><xls:RequestHeader clientName="{{ user }}" clientPassword="{{ apikey }}" sessionID="{{ sessionId }}" configuration="{{ mapConfig }}" /><xls:Request maximumResponses="{{ maxResponses }}" version="{{ version }}" requestID="{{ requestId }}" methodName="{{ requestName }}">{{{ requestBody }}}</xls:Request></xls:XLS>',
@@ -2920,8 +2920,17 @@ var superagent = function(exports){
   }
   
   function addressToXML(address, opts) {
-      var results = [],
-          parser = _templates.Address;
+      var data,
+          results = [],
+          parser = _templates.Address,
+          regionTypes = ['Municipality'];
+          
+      function qualifyRegion(region, idx) {
+          data.regions[idx] = {
+              text: region,
+              type: regionTypes[idx] || 'CountrySubdivision'
+          };
+      }
           
       // ensure we have opts
       opts = opts || {};
@@ -2936,8 +2945,6 @@ var superagent = function(exports){
       }
       
       for (var ii = 0, count = address.length; ii < count; ii++) {
-          var data;
-          
           // if the specified address is a string, then convert into a tmp object
           if (typeof address[ii] == 'string' || (address[ii] instanceof String)) {
               data = _.extend({}, opts, {
@@ -2946,6 +2953,9 @@ var superagent = function(exports){
           }
           else {
               data = _.extend({}, opts, address[ii]);
+              
+              // qualify regions
+              (data.regions || []).forEach(qualifyRegion);
           }
           
           results[ii] = parser(data);
@@ -3147,11 +3157,10 @@ var superagent = function(exports){
       opts.lang = opts.lang || 'EN';
       
       // create the address xml
-      opts.address = dws.addressToXML(address);
-      console.log(opts);
+      opts.address = dws.addressToXML(address, opts);
   
       // run the request
-      dws('DetermineRouteRequest', opts, callback);
+      dws('GeocodeRequest', opts, callback);
   };
   /**
   # dws.route(points, opts, callback)
