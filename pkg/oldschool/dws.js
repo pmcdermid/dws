@@ -20,6 +20,8 @@
       handshakeResponse,
       reTrailingSlash = /\/$/,
       reCoreRequestName = /^(.*)Request$/i,
+      reAlias = /^(.*?)\.(.*)$/,
+      reDetectHost = /^http\:\/\/(.*?)\//,
       
       // initialise default option values
       defaultOpts = {
@@ -40,7 +42,10 @@
           endpoint: 'http://ws.decarta.com/openls',
           
           // routing defaults
-          rulesFile: 'maneuver-rules'
+          rulesFile: 'maneuver-rules',
+          
+          // initialise server defaults
+          maxHostAliases: 3
       };
       
   // compile the resources
@@ -130,7 +135,7 @@
       }
       
       // clone the options into request data
-      data = _.clone(opts);
+      data = _.defaults(_.clone(opts || {}), defaultOpts);
       
       // initialise the request id
       data.requestId = data.requestId || nextRequestId++;
@@ -159,7 +164,7 @@
       
       // make the request
       jsonget(
-          opts.endpoint.replace(reTrailingSlash, '') + '/JSON', 
+          data.endpoint.replace(reTrailingSlash, '') + '/JSON', 
           args, 
           jsonOpts, 
           function(err, results) {
@@ -181,6 +186,48 @@
               callback(err, coreResponse);
           }
       );
+  }
+  
+  function queryConfig(opts, callback) {
+      // remap args if required
+      if (typeof opts == 'function') {
+          callback = opts;
+          opts = {};
+      }
+      
+      // initialise default opts
+      // we will need to access this detail later so while the makeRequest function 
+      // injects defaults we will need them here also
+      opts = _.defaults(opts || {}, defaultOpts);
+      
+      handshake(opts, function(err, config) {
+          var aliases, hostName, hosts = [];
+          
+          if (err) {
+              callback(err);
+              return;
+          }
+          
+          aliases = config.maxHostAliases || opts.maxHostAliases;
+          hostName = config.hostName || opts.endpoint.replace(reDetectHost, '$1');
+          
+          // initialise the hosts
+          if (aliases) {
+              for (var ii = 0; ii < aliases; ii++) {
+                  hosts[ii] = 'http://' + hostName.replace(reAlias, '$1-0' + (ii + 1) + '.$2');
+              } // for
+          }
+          else {
+              hosts = ['http://' + hostName];
+          } // if..else
+          
+          callback(null, {
+              hosts: hosts,
+              user: opts.user,
+              sessionId: opts.sessionId,
+              mapConfig: opts.mapConfig
+          });
+      });
   }
   
   function handshake(opts, callback) {
@@ -232,10 +279,6 @@
       // TODO: consider returning a promise instead
       callback = callback || function() {};
       
-      // ensure we have been passed options
-      // and fill in defaults where required
-      opts = _.defaults(opts || {}, defaultOpts);
-      
       // check handshake done
       handshake(opts, function(err, data) {
           // if we received an error, then fire the callback and return
@@ -253,6 +296,7 @@
   dws.addressToXML = addressToXML;
   dws.configure = configure;
   dws.makeRequest = makeRequest;
+  dws.queryConfig = queryConfig;
   dws.handshake = handshake;
   dws.template = template;
   
