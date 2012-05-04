@@ -2,7 +2,8 @@ var debug = require('debug'),
     jsonget = require('jsonget'),
     handlebars = require('handlebars'),
     async = require('async'),
-    underscore = require('underscore');
+    underscore = require('underscore'),
+    timelord = require('timelord');
 
 
 var _templates = {
@@ -441,6 +442,7 @@ function parseStreet(streetAddress) {
         }
     };
 }
+
 /**
 # dws.route(points, opts, callback)
 
@@ -495,7 +497,40 @@ dws.route = function(points, opts, callback) {
     opts.waypoints = waypoints;
     
     // run the request
-    dws('DetermineRouteRequest', opts, callback);
+    dws('DetermineRouteRequest', opts, function(err, response) {
+        // if we don't have an error, then extract the useful stuff from the response
+        if (! err) {
+            callback(null, {
+                geometry: response.RouteGeometry.LineString.pos,
+                instructions: parseInstructions(response.RouteInstructionsList)
+            });
+        }
+        else {
+            callback(err);
+        }
+    });
 };
+
+function parseInstructions(instructionList) {
+    var fnresult = [],
+        instructions = instructionList && instructionList.RouteInstruction ? 
+            instructionList.RouteInstruction : [];
+            
+    for (var ii = 0; ii < instructions.length; ii++) {
+        // initialise the time and duration for this instruction
+        var distance = instructions[ii].distance;
+        
+        fnresult.push({
+            text: instructions[ii].Instruction,
+            latlng: instructions[ii].Point,
+            distance: distance.value + (distance.uom || 'M').toUpperCase(),
+            time: timelord(instructions[ii].duration, '8601')
+        });
+    } // for
+    
+
+    // T5.log("parsed " + fnresult.length + " instructions", fnresult[0], fnresult[1], fnresult[2]);
+    return fnresult;
+} // parseInstructions
 
 module.exports = dws;
