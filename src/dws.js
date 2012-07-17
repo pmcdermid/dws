@@ -105,22 +105,19 @@ function extractCoreResponse(requestType, response) {
         errNodes = ['response', 'XLS', 'ResponseHeader', 'ErrorList'],
         realResponse = response, errResponse = response;
         
-    // console.log(nodes);
-    // console.log(require('util').inspect(realResponse, false, Infinity, true));
-
-    while (realResponse && nodes.length) {
-        realResponse = realResponse[nodes.shift()];
+    // look for an error within the response
+    while (errResponse && errNodes.length) {
+        errResponse = errResponse[errNodes.shift()];
     }
-    
-    // if we don't have a real response, look for an error
-    if (! realResponse) {
-        while (errResponse && errNodes.length) {
-            errResponse = errResponse[errNodes.shift()];
+
+    // if we didn't find an error, then dive in for the result
+    if (! errResponse) {
+        while (realResponse && nodes.length) {
+            realResponse = realResponse[nodes.shift()];
         }
     }
     
-    // console.log(require('util').inspect(response, false, Infinity, true));
-    return realResponse || new Error(errResponse.Error.message);
+    return errResponse ? new Error(errResponse.Error.message) : realResponse;
 }
 
 function makeRequest(requestType, opts, callback) {
