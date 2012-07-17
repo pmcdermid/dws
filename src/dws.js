@@ -109,7 +109,7 @@ function extractCoreResponse(requestType, response) {
     while (errResponse && errNodes.length) {
         errResponse = errResponse[errNodes.shift()];
     }
-
+    
     // if we didn't find an error, then dive in for the result
     if (! errResponse) {
         while (realResponse && nodes.length) {
@@ -174,7 +174,7 @@ function makeRequest(requestType, opts, callback) {
                 // results
                 if (coreResponse instanceof Error) {
                     err = coreResponse;
-                    coreResponse = results;
+                    coreResponse = null;
                 }
             }
             

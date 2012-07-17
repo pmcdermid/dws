@@ -26,8 +26,10 @@ dws.geocode = function(address, opts, callback) {
     dws('GeocodeRequest', opts, function(err, response) {
         // if we haven't received an error, make the response more consistent
         if (! err) {
-            var results = (response.GeocodeResponseList || {}).GeocodedAddress || [];
-            
+            var results = (response.GeocodeResponseList || {}).GeocodedAddress || [],
+                matchType,
+                noResults = true;
+
             // if the response list is not an array, turn it into one
             if (! Array.isArray(results)) {
                 results = [results];
@@ -37,7 +39,22 @@ dws.geocode = function(address, opts, callback) {
             results.forEach(function(result) {
                 result.address = parseAddress(result.Address);
                 result.pos = result.Point.pos;
+                
+                // get the match type
+                matchType = (result.GeocodeMatchCode || {}).matchType;
+                
+                // determine whether we have no results
+                noResults = noResults && matchType === 'NO_MATCH';
             });
+            
+            // if we have a match type of 'NO_MATCH', then return an error
+            if (noResults) {
+                var missingAddresses = results.map(function(result) {
+                    return result.address.toString();
+                });
+                
+                err = new Error('No match found for input addresses (' + missingAddresses.join('; ') + ')');
+            }
 
             callback(err, results);
         }

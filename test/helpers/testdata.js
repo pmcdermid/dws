@@ -16,7 +16,8 @@ var testdata = {
         input: 'Four North Second Street Suite 950 San Jose',
         output: [
             '<xls:Address countryCode="US" language="EN"><xls:freeFormAddress>Four North Second Street Suite 950 San Jose</xls:freeFormAddress></xls:Address>'
-        ]
+        ],
+        noresults: true
     }, {
         type: 'a single structured address',
         input: {
@@ -28,6 +29,17 @@ var testdata = {
         output: [
             '<xls:Address countryCode="AU" language="EN"><xls:StreetAddress><xls:Building number="123"/><xls:Street>QUEEN ST</xls:Street></xls:StreetAddress><xls:Place type="Municipality">BRISBANE</xls:Place><xls:Place type="CountrySubdivision">QLD</xls:Place></xls:Address>'
         ]
+    }, {
+        type: 'a single structure address (will not geocode)',
+        input: {
+            street: 'WATERFORD RD',
+            regions: ['QUEENSLAND'],
+            country: 'AU'
+        },
+        output: [
+            '<xls:Address countryCode="AU" language="EN"><xls:StreetAddress><xls:Street>WATERFORD RD</xls:Street></xls:StreetAddress><xls:Place type="Municipality">QUEENSLAND</xls:Place></xls:Address>'
+        ],
+        noresults: true
     }]
 };
 

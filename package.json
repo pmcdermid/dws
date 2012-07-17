@@ -8,7 +8,7 @@
     "mapping"
   ],
   "version": "0.2.0",
-  "main": "pkg/cjs/dws",
+  "main": "dist/commonjs/dws",
   "engines": {
     "node": ">= 0.4.x < 0.7.0"
   },
