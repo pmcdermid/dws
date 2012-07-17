@@ -7,7 +7,7 @@
     "gis",
     "mapping"
   ],
-  "version": "0.1.5",
+  "version": "0.2.0",
   "main": "pkg/cjs/dws",
   "engines": {
     "node": ">= 0.4.x < 0.7.0"
