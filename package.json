@@ -33,7 +33,7 @@
     "url": "http://github.com/DamonOehlman/dws/issues"
   },
   "scripts": {
-    "test": "./node_modules/mocha/bin/mocha --reporter spec --timeout 15000"
+    "test": "./node_modules/mocha/bin/mocha --reporter spec --timeout 60000"
   },
   "contributors": [],
   "optionalDependencies": {}

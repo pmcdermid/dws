@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
 build:
-	@interleave src/dws.js --package
+	@interleave build src/*.js --wrap
 	
 	@bake pkg/oldschool/dws.js --output test/browser
 

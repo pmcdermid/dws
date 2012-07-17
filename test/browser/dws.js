@@ -148,7 +148,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
                 else {
                     completed += 1;
                     if (completed === arr.length) {
-                        callback();
+                        callback(null);
                     }
                 }
             });
@@ -170,7 +170,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
                 else {
                     completed += 1;
                     if (completed === arr.length) {
-                        callback();
+                        callback(null);
                     }
                     else {
                         iterate();
@@ -180,41 +180,41 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
         };
         iterate();
     };
-    
+
     async.forEachLimit = function (arr, limit, iterator, callback) {
         callback = callback || function () {};
         if (!arr.length || limit <= 0) {
-            return callback(); 
+            return callback();
         }
         var completed = 0;
         var started = 0;
         var running = 0;
-        
+
         (function replenish () {
-          if (completed === arr.length) {
-              return callback();
-          }
-          
-          while (running < limit && started < arr.length) {
-            iterator(arr[started], function (err) {
-              if (err) {
-                  callback(err);
-                  callback = function () {};
-              }
-              else {
-                  completed += 1;
-                  running -= 1;
-                  if (completed === arr.length) {
-                      callback();
-                  }
-                  else {
-                      replenish();
-                  }
-              }
-            });
-            started += 1;
-            running += 1;
-          }
+            if (completed === arr.length) {
+                return callback();
+            }
+
+            while (running < limit && started < arr.length) {
+                started += 1;
+                running += 1;
+                iterator(arr[started - 1], function (err) {
+                    if (err) {
+                        callback(err);
+                        callback = function () {};
+                    }
+                    else {
+                        completed += 1;
+                        running -= 1;
+                        if (completed === arr.length) {
+                            callback();
+                        }
+                        else {
+                            replenish();
+                        }
+                    }
+                });
+            }
         })();
     };
 
@@ -457,7 +457,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
             var ready = function () {
                 return _reduce(requires, function (a, x) {
                     return (a && results.hasOwnProperty(x));
-                }, true);
+                }, true) && !results.hasOwnProperty(k);
             };
             if (ready()) {
                 task[task.length - 1](taskCallback, results);
@@ -743,7 +743,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     async.unmemoize = function (fn) {
       return function () {
         return (fn.unmemoized || fn).apply(null, arguments);
-      }
+      };
     };
 
 }());
@@ -828,7 +828,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
       obj.forEach(iterator, context);
     } else if (obj.length === +obj.length) {
       for (var i = 0, l = obj.length; i < l; i++) {
-        if (i in obj && iterator.call(context, obj[i], i, obj) === breaker) return;
+        if (iterator.call(context, obj[i], i, obj) === breaker) return;
       }
     } else {
       for (var key in obj) {
@@ -848,7 +848,6 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     each(obj, function(value, index, list) {
       results[results.length] = iterator.call(context, value, index, list);
     });
-    if (obj.length === +obj.length) results.length = obj.length;
     return results;
   };
 
@@ -965,7 +964,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   _.invoke = function(obj, method) {
     var args = slice.call(arguments, 2);
     return _.map(obj, function(value) {
-      return (_.isFunction(method) ? method || value : value[method]).apply(value, args);
+      return (_.isFunction(method) ? method : value[method]).apply(value, args);
     });
   };
 
@@ -975,8 +974,12 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   };
 
   // Return the maximum element or (element-based computation).
+  // Can't optimize arrays of integers longer than 65,535 elements.
+  // See: https://bugs.webkit.org/show_bug.cgi?id=80797
   _.max = function(obj, iterator, context) {
-    if (!iterator && _.isArray(obj) && obj[0] === +obj[0]) return Math.max.apply(Math, obj);
+    if (!iterator && _.isArray(obj) && obj[0] === +obj[0] && obj.length < 65535) {
+      return Math.max.apply(Math, obj);
+    }
     if (!iterator && _.isEmpty(obj)) return -Infinity;
     var result = {computed : -Infinity};
     each(obj, function(value, index, list) {
@@ -988,7 +991,9 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
 
   // Return the minimum element (or element-based computation).
   _.min = function(obj, iterator, context) {
-    if (!iterator && _.isArray(obj) && obj[0] === +obj[0]) return Math.min.apply(Math, obj);
+    if (!iterator && _.isArray(obj) && obj[0] === +obj[0] && obj.length < 65535) {
+      return Math.min.apply(Math, obj);
+    }
     if (!iterator && _.isEmpty(obj)) return Infinity;
     var result = {computed : Infinity};
     each(obj, function(value, index, list) {
@@ -1000,10 +1005,12 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
 
   // Shuffle an array.
   _.shuffle = function(obj) {
-    var shuffled = [], rand;
-    each(obj, function(value, index, list) {
-      rand = Math.floor(Math.random() * (index + 1));
-      shuffled[index] = shuffled[rand];
+    var rand;
+    var index = 0;
+    var shuffled = [];
+    each(obj, function(value) {
+      rand = Math.floor(Math.random() * ++index);
+      shuffled[index - 1] = shuffled[rand];
       shuffled[rand] = value;
     });
     return shuffled;
@@ -1105,18 +1112,21 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     return _.filter(array, function(value){ return !!value; });
   };
 
+  // Internal implementation of a recursive `flatten` function.
+  var flatten = function(input, shallow, output) {
+    each(input, function(value) {
+      if (_.isArray(value)) {
+        shallow ? push.apply(output, value) : flatten(value, shallow, output);
+      } else {
+        output.push(value);
+      }
+    });
+    return output;
+  };
+
   // Return a completely flattened version of an array.
   _.flatten = function(array, shallow) {
-    return (function flatten(input, output) {
-      each(input, function(value) {
-        if (_.isArray(value)) {
-          shallow ? push.apply(output, value) : flatten(value, output);
-        } else {
-          output.push(value);
-        }
-      });
-      return output;
-    })(array, []);
+    return flatten(array, shallow, []);
   };
 
   // Return a version of the array that does not contain the specified value(s).
@@ -1130,10 +1140,8 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   _.uniq = _.unique = function(array, isSorted, iterator) {
     var initial = iterator ? _.map(array, iterator) : array;
     var results = [];
-    // The `isSorted` flag is irrelevant if the array only contains two elements.
-    if (array.length < 3) isSorted = true;
     _.reduce(initial, function(memo, value, index) {
-      if (isSorted ? _.last(memo) !== value || !memo.length : !_.include(memo, value)) {
+      if (isSorted ? (_.last(memo) !== value || !memo.length) : !_.include(memo, value)) {
         memo.push(value);
         results.push(array[index]);
       }
@@ -1145,12 +1153,12 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   // Produce an array that contains the union: each distinct element from all of
   // the passed-in arrays.
   _.union = function() {
-    return _.uniq(_.flatten(arguments, true));
+    return _.uniq(flatten(arguments, true, []));
   };
 
   // Produce an array that contains every item shared between all the
-  // passed-in arrays. (Aliased as "intersect" for back-compat.)
-  _.intersection = _.intersect = function(array) {
+  // passed-in arrays.
+  _.intersection = function(array) {
     var rest = slice.call(arguments, 1);
     return _.filter(_.uniq(array), function(item) {
       return _.every(rest, function(other) {
@@ -1162,7 +1170,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   // Take the difference between one array and a number of other arrays.
   // Only the elements present in just the first array will remain.
   _.difference = function(array) {
-    var rest = _.flatten(slice.call(arguments, 1), true);
+    var rest = flatten(slice.call(arguments, 1), true, []);
     return _.filter(array, function(value){ return !_.include(rest, value); });
   };
 
@@ -1172,8 +1180,20 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     var args = slice.call(arguments);
     var length = _.max(_.pluck(args, 'length'));
     var results = new Array(length);
-    for (var i = 0; i < length; i++) results[i] = _.pluck(args, "" + i);
+    for (var i = 0; i < length; i++) {
+      results[i] = _.pluck(args, "" + i);
+    }
     return results;
+  };
+
+  // Zip together two arrays -- an array of keys and an array of values -- into
+  // a single object.
+  _.zipObject = function(keys, values) {
+    var result = {};
+    for (var i = 0, l = keys.length; i < l; i++) {
+      result[keys[i]] = values[i];
+    }
+    return result;
   };
 
   // If the browser doesn't supply us with indexOf (I'm looking at you, **MSIE**),
@@ -1190,7 +1210,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
       return array[i] === item ? i : -1;
     }
     if (nativeIndexOf && array.indexOf === nativeIndexOf) return array.indexOf(item);
-    for (i = 0, l = array.length; i < l; i++) if (i in array && array[i] === item) return i;
+    for (i = 0, l = array.length; i < l; i++) if (array[i] === item) return i;
     return -1;
   };
 
@@ -1199,7 +1219,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     if (array == null) return -1;
     if (nativeLastIndexOf && array.lastIndexOf === nativeLastIndexOf) return array.lastIndexOf(item);
     var i = array.length;
-    while (i--) if (i in array && array[i] === item) return i;
+    while (i--) if (array[i] === item) return i;
     return -1;
   };
 
@@ -1363,7 +1383,9 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   _.after = function(times, func) {
     if (times <= 0) return func();
     return function() {
-      if (--times < 1) { return func.apply(this, arguments); }
+      if (--times < 1) {
+        return func.apply(this, arguments);
+      }
     };
   };
 
@@ -1407,7 +1429,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   // Return a copy of the object only containing the whitelisted properties.
   _.pick = function(obj) {
     var result = {};
-    each(_.flatten(slice.call(arguments, 1)), function(key) {
+    each(flatten(slice.call(arguments, 1), true, []), function(key) {
       if (key in obj) result[key] = obj[key];
     });
     return result;
@@ -1555,32 +1577,20 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     return obj === Object(obj);
   };
 
-  // Is a given variable an arguments object?
+  // Add some isType methods: isArguments, isFunction, isString, isNumber, isDate, isRegExp.
+  each(['Arguments', 'Function', 'String', 'Number', 'Date', 'RegExp'], function(name) {
+    _['is' + name] = function(obj) {
+      return toString.call(obj) == '[object ' + name + ']';
+    };
+  });
+  
   // Define a fallback version of the method in browsers (ahem, IE), where
   // there isn't any inspectable "Arguments" type.
-  _.isArguments = function(obj) {
-    return toString.call(obj) == '[object Arguments]';
-  };
   if (!_.isArguments(arguments)) {
     _.isArguments = function(obj) {
       return !!(obj && _.has(obj, 'callee'));
     };
   }
-
-  // Is a given value a function?
-  _.isFunction = function(obj) {
-    return toString.call(obj) == '[object Function]';
-  };
-
-  // Is a given value a string?
-  _.isString = function(obj) {
-    return toString.call(obj) == '[object String]';
-  };
-
-  // Is a given value a number?
-  _.isNumber = function(obj) {
-    return toString.call(obj) == '[object Number]';
-  };
 
   // Is a given object a finite number?
   _.isFinite = function(obj) {
@@ -1598,16 +1608,6 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     return obj === true || obj === false || toString.call(obj) == '[object Boolean]';
   };
 
-  // Is a given value a date?
-  _.isDate = function(obj) {
-    return toString.call(obj) == '[object Date]';
-  };
-
-  // Is the given value a regular expression?
-  _.isRegExp = function(obj) {
-    return toString.call(obj) == '[object RegExp]';
-  };
-
   // Is a given value equal to null?
   _.isNull = function(obj) {
     return obj === null;
@@ -1618,7 +1618,8 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     return obj === void 0;
   };
 
-  // Does an object have the given "own" property?
+  // Shortcut function for checking if an object has a given property directly
+  // on itself (in other words, not on a prototype).
   _.has = function(obj, key) {
     return hasOwnProperty.call(obj, key);
   };
@@ -1643,15 +1644,24 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
     for (var i = 0; i < n; i++) iterator.call(context, i);
   };
 
+  // List of HTML entities for escaping.
+  var htmlEscapes = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#x27;',
+    '/': '&#x2F;'
+  };
+
+  // Regex containing the keys listed immediately above.
+  var htmlEscaper = /[&<>"'\/]/g;
+
   // Escape a string for HTML interpolation.
   _.escape = function(string) {
-    return (''+string)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#x27;')
-      .replace(/\//g,'&#x2F;');
+    return ('' + string).replace(htmlEscaper, function(match) {
+      return htmlEscapes[match];
+    });
   };
 
   // If the value of the named property is a function then invoke it;
@@ -1694,16 +1704,16 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   // Certain characters need to be escaped so that they can be put into a
   // string literal.
   var escapes = {
-    '\\': '\\',
-    "'": "'",
-    'r': '\r',
-    'n': '\n',
-    't': '\t',
-    'u2028': '\u2028',
-    'u2029': '\u2029'
+    '\\':   '\\',
+    "'":    "'",
+    r:      '\r',
+    n:      '\n',
+    t:      '\t',
+    u2028:  '\u2028',
+    u2029:  '\u2029'
   };
 
-  for (var p in escapes) escapes[escapes[p]] = p;
+  for (var key in escapes) escapes[escapes[key]] = key;
   var escaper = /\\|'|\r|\n|\t|\u2028|\u2029/g;
   var unescaper = /\\(\\|'|r|n|t|u2028|u2029)/g;
 
@@ -1735,7 +1745,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
         return "'+\n((__t=(" + unescape(code) + "))==null?'':__t)+\n'";
       })
       .replace(settings.evaluate || noMatch, function(match, code) {
-        return "';\n" + unescape(code) + "\n;__p+='";
+        return "';\n" + unescape(code) + "\n__p+='";
       }) + "';\n";
 
     // If a variable is not specified, place data values in local scope.
@@ -1880,7 +1890,7 @@ e)},invokePartial:function(b,e,a,f,g){if(b===void 0)throw new Handlebars.Excepti
   
       // if the format is not defined, return the simple format
       if (typeof format == 'undefined' || format) {
-          var hours, minutes, output = [];
+          var hours, minutes, totalSeconds, output = [];
           
           if (this.days) {
               output.push(this.days + ' days');
@@ -3061,536 +3071,541 @@ var superagent = function(exports){
   
 })(this);
 
-;
-(function (glob) {
+;(function (glob) {
   
-  var _templates = {
-    'Address': '<xls:Address countryCode="{{ country }}" language="{{ lang }}">{{#if street}}<xls:StreetAddress>{{#if number}}<xls:Building number="{{ number }}"/>{{/if}}<xls:Street>{{ street }}</xls:Street></xls:StreetAddress>{{#each regions}}<xls:Place type="{{ type }}">{{ text }}</xls:Place>{{/each}}{{else}}<xls:freeFormAddress>{{ text }}</xls:freeFormAddress>{{/if}}</xls:Address>',
-    'DetermineRouteRequest': '<xls:DetermineRouteRequest provideRouteHandle="{{ provideRouteHandle }}" distanceUnit="{{ distanceUnit }}" routeQueryType="{{ routeQueryType }}"><xls:RoutePlan><xls:RoutePreference>{{ routePreference }}</xls:RoutePreference><xls:WayPointList>{{{ waypoints }}}</xls:WayPointList></xls:RoutePlan>{{#if instructions}}<xls:RouteInstructionsRequest rules="{{ rulesFile }}" providePoint="true" />{{/if}}{{#if geometry}}<xls:RouteGeometryRequest />{{/if}}</xls:DetermineRouteRequest>',
-    'GeocodeRequest': '<xls:GeocodeRequest>{{#each address}}{{{ this }}}{{/each}}</xls:GeocodeRequest>',
-    'Request': '<xls:XLS version="1" xls:lang="en" xmlns:xls="http://www.opengis.net/xls" rel="{{ ddsVersion }}" xmlns:gml="http://www.opengis.net/gml"><xls:RequestHeader clientName="{{ user }}" clientPassword="{{ apikey }}" sessionID="{{ sessionId }}" configuration="{{ mapConfig }}" /><xls:Request maximumResponses="{{ maxResponses }}" version="{{ version }}" requestID="{{ requestId }}" methodName="{{ requestName }}">{{{ requestBody }}}</xls:Request></xls:XLS>',
-    'RUOKRequest': '<xls:RUOKRequest />'
-  };
+  (function (glob) {
+    
+    var _templates = {
+      'Address': '<xls:Address countryCode="{{ country }}" language="{{ lang }}">{{#if street}}<xls:StreetAddress>{{#if number}}<xls:Building number="{{ number }}"/>{{/if}}<xls:Street>{{ street }}</xls:Street></xls:StreetAddress>{{#each regions}}<xls:Place type="{{ type }}">{{ text }}</xls:Place>{{/each}}{{else}}<xls:freeFormAddress>{{ text }}</xls:freeFormAddress>{{/if}}</xls:Address>',
+      'DetermineRouteRequest': '<xls:DetermineRouteRequest provideRouteHandle="{{ provideRouteHandle }}" distanceUnit="{{ distanceUnit }}" routeQueryType="{{ routeQueryType }}"><xls:RoutePlan><xls:RoutePreference>{{ routePreference }}</xls:RoutePreference><xls:WayPointList>{{{ waypoints }}}</xls:WayPointList></xls:RoutePlan>{{#if instructions}}<xls:RouteInstructionsRequest rules="{{ rulesFile }}" providePoint="true" />{{/if}}{{#if geometry}}<xls:RouteGeometryRequest />{{/if}}</xls:DetermineRouteRequest>',
+      'GeocodeRequest': '<xls:GeocodeRequest>{{#each address}}{{{ this }}}{{/each}}</xls:GeocodeRequest>',
+      'Request': '<xls:XLS version="1" xls:lang="en" xmlns:xls="http://www.opengis.net/xls" rel="{{ ddsVersion }}" xmlns:gml="http://www.opengis.net/gml"><xls:RequestHeader clientName="{{ user }}" clientPassword="{{ apikey }}" sessionID="{{ sessionId }}" configuration="{{ mapConfig }}" /><xls:Request maximumResponses="{{ maxResponses }}" version="{{ version }}" requestID="{{ requestId }}" methodName="{{ requestName }}">{{{ requestBody }}}</xls:Request></xls:XLS>',
+      'RUOKRequest': '<xls:RUOKRequest />'
+    };
+    
+    
+    // get the handlebars library
+    var hbs = typeof Handlebars != 'undefined' ? Handlebars : handlebars,
+        _ = typeof window != 'undefined' ? window._ : underscore,
+        sessionId = new Date().getTime(),
+        dbg = debug('dws'),
+        ddsCurrentVersion = '4.5.2',
+        nextRequestId = 1,
+        handshakeResponse,
+        reTrailingSlash = /\/$/,
+        reCoreRequestName = /^(.*)Request$/i,
+        reAlias = /^(.*?)\.(.*)$/,
+        reDetectHost = /^http\:\/\/(.*?)\//,
+        
+        // initialise default option values
+        defaultOpts = {
+            // initialise the default map configuration
+            mapConfig: 'global-decarta',
+            
+            // set the max responses to the devzone default of 25
+            maxResponses: 25,
+            version: '1.0',
+            
+            // create a new default session id
+            sessionId: new Date().getTime(),
+            
+            // initialise the default dds version
+            ddsVersion: '4.5.2',
+            
+            // initialise the default endpoint
+            endpoint: 'http://ws.decarta.com/openls',
+            
+            // routing defaults
+            rulesFile: 'maneuver-rules',
+            
+            // initialise server defaults
+            maxHostAliases: 3
+        };
+        
+    // compile the resources
+    for (var key in _templates) {
+        _templates[key] = hbs.compile(_templates[key]);
+    }
+    
+    function addressToXML(address, opts) {
+        var data,
+            results = [],
+            parser = _templates.Address,
+            regionTypes = ['Municipality'];
+            
+        function qualifyRegion(region, idx) {
+            data.regions[idx] = {
+                text: region,
+                type: regionTypes[idx] || 'CountrySubdivision'
+            };
+        }
+            
+        // ensure we have opts
+        opts = opts || {};
+        
+        // default the opts
+        opts.country = opts.country || 'US';
+        opts.lang = opts.lang || 'EN';
+        
+        // if the address is not an array, then make it one
+        if (! Array.isArray(address)) {
+            address = [address];
+        }
+        
+        for (var ii = 0, count = address.length; ii < count; ii++) {
+            // if the specified address is a string, then convert into a tmp object
+            if (typeof address[ii] == 'string' || (address[ii] instanceof String)) {
+                data = _.extend({}, opts, {
+                    text: address[ii]
+                });
+            }
+            else {
+                data = _.extend({}, opts, address[ii]);
+                
+                // ensure country is provided
+                // we do this as the extend will always override the country member of opts using the address
+                // if it has been removed, then it needs to be replaced
+                data.country = data.country || opts.country;
+                
+                // qualify regions
+                (data.regions || []).forEach(qualifyRegion);
+            }
+            
+            results[ii] = parser(data);
+        }
+    
+        return results;
+    }
+    
+    function configure(opts) {
+        _.extend(defaultOpts, opts);
+    }
+    
+    function extractCoreResponse(requestType, response) {
+        var responseType = requestType.replace(reCoreRequestName, '$1Response'),
+            nodes = ['response', 'XLS', 'Response', responseType],
+            errNodes = ['response', 'XLS', 'ResponseHeader', 'ErrorList'],
+            realResponse = response, errResponse = response;
+            
+        // console.log(nodes);
+        // console.log(require('util').inspect(realResponse, false, Infinity, true));
+    
+        while (realResponse && nodes.length) {
+            realResponse = realResponse[nodes.shift()];
+        }
+        
+        // if we don't have a real response, look for an error
+        if (! realResponse) {
+            while (errResponse && errNodes.length) {
+                errResponse = errResponse[errNodes.shift()];
+            }
+        }
+        
+        // console.log(require('util').inspect(response, false, Infinity, true));
+        return realResponse || new Error(errResponse.Error.message);
+    }
+    
+    function makeRequest(requestType, opts, callback) {
+        var args, data, xml, targetUrl, jsonOpts;
+        
+        // if we don't have a template for the specified request type, then throw an error
+        if (typeof _templates[requestType] != 'function') {
+            throw new Error('Cannot find a template for a "' + requestType + '" request.');
+        }
+        
+        // clone the options into request data
+        data = _.defaults(_.clone(opts || {}), defaultOpts);
+        
+        // initialise the request id
+        data.requestId = data.requestId || nextRequestId++;
+        
+        // generate the inner content
+        data.requestName = requestType;
+        data.requestBody = _templates[requestType](data);
+    
+        // create the xml request content
+        xml = _templates.Request(data);
+        dbg('sending request: ' + xml);
+        
+        // create the request args
+        args = {
+            reqID: data.requestId,
+            chunkNo: 1, 
+            numChunks: 1,
+            data: xml,
+            responseFormat: 'JSON'
+        };
+        
+        // specify jsonget opts
+        // the decarta API insists (incorrectly) on a callback so we have to give it one
+        jsonOpts = {
+            forceCallback: true
+        };
+        
+        // make the request
+        jsonget(
+            data.endpoint.replace(reTrailingSlash, '') + '/JSON', 
+            args, 
+            jsonOpts, 
+            function(err, results) {
+                var coreResponse;
+                
+                // extract the core response
+                if (! err) {
+                    coreResponse = extractCoreResponse(requestType, results);
+    
+                    // if we only extracted an error, then map the core response 
+                    // to the error param and the core response back to the complete
+                    // results
+                    if (coreResponse instanceof Error) {
+                        err = coreResponse;
+                        coreResponse = results;
+                    }
+                }
+                
+                callback(err, coreResponse);
+            }
+        );
+    }
+    
+    function queryConfig(opts, callback) {
+        // remap args if required
+        if (typeof opts == 'function') {
+            callback = opts;
+            opts = {};
+        }
+        
+        // initialise default opts
+        // we will need to access this detail later so while the makeRequest function 
+        // injects defaults we will need them here also
+        opts = _.defaults(opts || {}, defaultOpts);
+        
+        handshake(opts, function(err, config) {
+            var aliases, hostName, hosts = [];
+            
+            if (err) {
+                callback(err);
+                return;
+            }
+            
+            aliases = config.maxHostAliases || opts.maxHostAliases;
+            hostName = config.hostName || opts.endpoint.replace(reDetectHost, '$1');
+            
+            // initialise the hosts
+            if (aliases) {
+                for (var ii = 0; ii < aliases; ii++) {
+                    hosts[ii] = 'http://' + hostName.replace(reAlias, '$1-0' + (ii + 1) + '.$2');
+                } // for
+            }
+            else {
+                hosts = ['http://' + hostName];
+            } // if..else
+            
+            callback(null, {
+                hosts: hosts,
+                user: opts.user,
+                sessionId: opts.sessionId,
+                mapConfig: opts.mapConfig
+            });
+        });
+    }
+    
+    function handshake(opts, callback) {
+        // if we have an existing handshake response, then trigger the callback
+        if (handshakeResponse) return callback(null, handshakeResponse);
+    
+        // make the ruokrequest
+        makeRequest('RUOKRequest', opts, function(err, response) {
+            // cache the handshake response
+            if (! err) {
+                handshakeResponse = response;
+            }
+            
+            callback(err, response);
+        });
+    }
+    
+    function template(name) {
+        return _templates[name];
+    }
+    
+    /**
+    # dws
+    This is a JS frontend for the decarta routing engine via their WebServices
+    frontend.
+    
+    ## Configurable Options
+    
+    - mapConfig:            The server map configuration to use (default = global-decarta)
+    - user:                 The username to use for authenticating with the decarta services
+    - apikey:               The api key for authenticating with the decarta services
+    
+    - maxResponses:         (default = 25)
+    - version:              (default = 1.0)
+    - requestId:            The request id (automatically incrementing)
+    - sessionId:            The session id (default = generated)
+    
+    - ddsVersion:           Set to the version of the DDS you are using (default = 4.5.2)
+    - endpoint:             The DDS Webservices endpoint (default: http://ws.decarta.com/openls)
+    */
+    function dws(requestType, opts, callback) {
+        // remap args if required
+        if (typeof opts == 'function') {
+            callback = opts;
+            opts = {};
+        }
+        
+        // initialise a default callback if none provided
+        // TODO: consider returning a promise instead
+        callback = callback || function() {};
+        
+        // check handshake done
+        handshake(opts, function(err, data) {
+            // if we received an error, then fire the callback and return
+            if (err) {
+                callback(err);
+                return;
+            }
+            
+            // TODO: apply the handshake option tweaks
+            makeRequest(requestType, opts, callback);
+        });
+    }
+    
+    // expose the create request and handshake functions
+    dws.addressToXML = addressToXML;
+    dws.configure = configure;
+    dws.makeRequest = makeRequest;
+    dws.queryConfig = queryConfig;
+    dws.handshake = handshake;
+    dws.template = template;
+    
+    // include the other operations
+    /**
+    # dws.geocode(address, opts, callback)
+    
+    ## Configurable Options
+    
+    - provideRouteHandle:   Whether or not a route handle should be returned (default = false)
+    - distanceUnit:         Distance units (default = KM)
+    - routeQueryType:       The type of decarta routing request to make, RMAN, RTXT, etc (default = RMAN)
+    
+    - routePreference:      What type of routing algorithm to use, fastest, shortest, etc (default = fastest)
+    
+    */
+    dws.geocode = function(address, opts, callback) {
+        var waypoints = '';
+    
+        // remap args if required
+        if (typeof opts == 'function') {
+            callback = opts;
+            opts = {};
+        }
+        
+        // create the address xml
+        opts.address = dws.addressToXML(address, opts);
+    
+        // run the request
+        dws('GeocodeRequest', opts, function(err, response) {
+            // if we haven't received an error, make the response more consistent
+            if (! err) {
+                var results = (response.GeocodeResponseList || {}).GeocodedAddress || [];
+                
+                // if the response list is not an array, turn it into one
+                if (! Array.isArray(results)) {
+                    results = [results];
+                }
+                
+                // iterate through the results and normalize the decarta address into a standard format
+                results.forEach(function(result) {
+                    result.address = parseAddress(result.Address);
+                    result.pos = result.Point.pos;
+                });
+    
+                callback(err, results);
+            }
+            else {
+                callback(err);
+            }
+        });
+    };
+    
+    function parseAddress(address, position) {
+        var streetDetails = parseStreet(address.StreetAddress),
+            regions = [];
+    
+        // iterate through the places
+        if (address.Place) {
+            if (! address.Place.length) {
+                address.Place = [address.Place];
+            } // if
+    
+            for (var ii = address.Place.length; ii--; ) {
+                regions[regions.length] = address.Place[ii].content;
+            } // for
+        } // if
+    
+        return {
+            building: streetDetails.building,
+            street: streetDetails.street,
+            regions: regions,
+            countryCode: address.countryCode || '',
+            postalCode: address.PostalCode || '',
+            
+            toString: function() {
+                return [streetDetails.toString()].concat(regions).join(', ');
+            }
+        };
+    } // parseAddress
+    
+    function parseStreet(streetAddress) {
+        // initialise variables
+        var street = "",
+            building = "";
+            
+        // ensure street address contains a value we can work with
+        streetAddress = streetAddress || {};
+            
+        // parse the street
+        if (streetAddress.Street) {
+            street = streetAddress.Street.content ? streetAddress.Street.content : streetAddress.Street;
+        } // if
+    
+        // strip any trailing highway specifiers from the street
+        street = (street && street.replace) ? street.replace(/\/\d+$/, "") : "";
+        
+        // parse the building
+        if (streetAddress.Building) {
+            // TODO: suspect name will be involved here possibly also
+            if (streetAddress.Building.number) {
+                building = streetAddress.Building.number;
+            } // if
+        } // if
+        
+        return {
+            building: building,
+            street: street,
+            
+            /*
+            calcMatchPercentage: function(input) {
+                var fnresult = 0,
+                    test1 = normalize(input), 
+                    test2 = normalize(street);
+                    
+                if (params.json.Building) {
+                    if (buildingMatch(input, params.json.Building.number.toString())) {
+                        fnresult += 0.2;
+                    } // if
+                } // if
+                    
+                if (test1 && test2 && T5.wordExists(test1, test2)) {
+                    fnresult += 0.8;
+                } // if
+    
+                return fnresult;
+            },
+            */
+            
+            toString: function() {
+                return (building ? building + ' ' : '') + street;
+            }
+        };
+    }
+    
+    /**
+    # dws.route(points, opts, callback)
+    
+    ## Configurable Options
+    
+    - provideRouteHandle:   Whether or not a route handle should be returned (default = false)
+    - distanceUnit:         Distance units (default = KM)
+    - routeQueryType:       The type of decarta routing request to make, RMAN, RTXT, etc (default = RMAN)
+    
+    - routePreference:      What type of routing algorithm to use, fastest, shortest, etc (default = fastest)
+    
+    */
+    dws.route = function(points, opts, callback) {
+        var waypoints = '';
+    
+        // remap args if required
+        if (typeof opts == 'function') {
+            callback = opts;
+            opts = {};
+        }
+        
+        // ensure we have options
+        opts = opts || {};
+    
+        // initialise DetermineRouteRequest tag attributes
+        opts.provideRouteHandle = (typeof opts.provideRouteHandle != 'undefined' && opts.provideRouteHandle).toString();
+        opts.distanceUnit = opts.distanceUnit || 'KM';
+        opts.routeQueryType = opts.routeQueryType || 'RMAN';
+    
+        // initialise the route preference option
+        opts.routePreference = opts.routePreference || 'fastest';
+        
+        // initialise instructions and route geometry to return true
+        opts.geometry = typeof opts.geometry == 'undefined' || opts.geometry;
+        
+        // initialise instruction defaults
+        opts.instructions = typeof opts.instructions == 'undefined' || opts.instructions;
+        
+        // create the waypoint tags manually
+        // only need to do this because of the StartPoint, EndPoint, ViaPoint tag names :/
+        for (var ii = 0, count = points.length; ii < count; ii++) {
+            // determine the appropriate tag to use for the waypoint
+            // as to why this is required, who knows....
+            var tagName = (ii === 0 ? "StartPoint" : (ii === count-1 ? "EndPoint" : "ViaPoint"));
+            
+            waypoints += '<xls:' + tagName + '><xls:Position><gml:Point><gml:pos>' + 
+                points[ii].lat + ' ' + points[ii].lon + 
+                '</gml:pos></gml:Point></xls:Position></xls:' + tagName + '>';
+        }
+        
+        // add the the waypoints to the options
+        opts.waypoints = waypoints;
+        
+        // run the request
+        dws('DetermineRouteRequest', opts, function(err, response) {
+            // if we don't have an error, then extract the useful stuff from the response
+            if (! err) {
+                callback(null, {
+                    geometry: response.RouteGeometry.LineString.pos,
+                    instructions: parseInstructions(response.RouteInstructionsList)
+                });
+            }
+            else {
+                callback(err);
+            }
+        });
+    };
+    
+    function parseInstructions(instructionList) {
+        var fnresult = [],
+            instructions = instructionList && instructionList.RouteInstruction ? 
+                instructionList.RouteInstruction : [];
+                
+        for (var ii = 0; ii < instructions.length; ii++) {
+            // initialise the time and duration for this instruction
+            var distance = instructions[ii].distance;
+            
+            fnresult.push({
+                text: instructions[ii].Instruction,
+                latlng: instructions[ii].Point,
+                distance: distance.value + (distance.uom || 'M').toUpperCase(),
+                time: timelord(instructions[ii].duration, '8601')
+            });
+        } // for
+        
+    
+        // T5.log("parsed " + fnresult.length + " instructions", fnresult[0], fnresult[1], fnresult[2]);
+        return fnresult;
+    } // parseInstructions
+    
+    glob.dws = dws;
+    
+  })(this);
   
   
-  // get the handlebars library
-  var hbs = typeof Handlebars != 'undefined' ? Handlebars : handlebars,
-      _ = typeof window != 'undefined' ? window._ : underscore,
-      sessionId = new Date().getTime(),
-      dbg = debug('dws'),
-      ddsCurrentVersion = '4.5.2',
-      nextRequestId = 1,
-      handshakeResponse,
-      reTrailingSlash = /\/$/,
-      reCoreRequestName = /^(.*)Request$/i,
-      reAlias = /^(.*?)\.(.*)$/,
-      reDetectHost = /^http\:\/\/(.*?)\//,
-      
-      // initialise default option values
-      defaultOpts = {
-          // initialise the default map configuration
-          mapConfig: 'global-decarta',
-          
-          // set the max responses to the devzone default of 25
-          maxResponses: 25,
-          version: '1.0',
-          
-          // create a new default session id
-          sessionId: new Date().getTime(),
-          
-          // initialise the default dds version
-          ddsVersion: '4.5.2',
-          
-          // initialise the default endpoint
-          endpoint: 'http://ws.decarta.com/openls',
-          
-          // routing defaults
-          rulesFile: 'maneuver-rules',
-          
-          // initialise server defaults
-          maxHostAliases: 3
-      };
-      
-  // compile the resources
-  for (var key in _templates) {
-      _templates[key] = hbs.compile(_templates[key]);
-  }
-  
-  function addressToXML(address, opts) {
-      var data,
-          results = [],
-          parser = _templates.Address,
-          regionTypes = ['Municipality'];
-          
-      function qualifyRegion(region, idx) {
-          data.regions[idx] = {
-              text: region,
-              type: regionTypes[idx] || 'CountrySubdivision'
-          };
-      }
-          
-      // ensure we have opts
-      opts = opts || {};
-      
-      // default the opts
-      opts.country = opts.country || 'US';
-      opts.lang = opts.lang || 'EN';
-      
-      // if the address is not an array, then make it one
-      if (! Array.isArray(address)) {
-          address = [address];
-      }
-      
-      for (var ii = 0, count = address.length; ii < count; ii++) {
-          // if the specified address is a string, then convert into a tmp object
-          if (typeof address[ii] == 'string' || (address[ii] instanceof String)) {
-              data = _.extend({}, opts, {
-                  text: address[ii]
-              });
-          }
-          else {
-              data = _.extend({}, opts, address[ii]);
-              
-              // ensure country is provided
-              // we do this as the extend will always override the country member of opts using the address
-              // if it has been removed, then it needs to be replaced
-              data.country = data.country || opts.country;
-              
-              // qualify regions
-              (data.regions || []).forEach(qualifyRegion);
-          }
-          
-          results[ii] = parser(data);
-      }
-  
-      return results;
-  }
-  
-  function configure(opts) {
-      _.extend(defaultOpts, opts);
-  }
-  
-  function extractCoreResponse(requestType, response) {
-      var responseType = requestType.replace(reCoreRequestName, '$1Response'),
-          nodes = ['response', 'XLS', 'Response', responseType],
-          errNodes = ['response', 'XLS', 'ResponseHeader', 'ErrorList'],
-          realResponse = response, errResponse = response;
-          
-      // console.log(nodes);
-      // console.log(require('util').inspect(realResponse, false, Infinity, true));
-  
-      while (realResponse && nodes.length) {
-          realResponse = realResponse[nodes.shift()];
-      }
-      
-      // if we don't have a real response, look for an error
-      if (! realResponse) {
-          while (errResponse && errNodes.length) {
-              errResponse = errResponse[errNodes.shift()];
-          }
-      }
-      
-      // console.log(require('util').inspect(response, false, Infinity, true));
-      return realResponse || new Error(errResponse.Error.message);
-  }
-  
-  function makeRequest(requestType, opts, callback) {
-      var args, data, xml, targetUrl, jsonOpts;
-      
-      // if we don't have a template for the specified request type, then throw an error
-      if (typeof _templates[requestType] != 'function') {
-          throw new Error('Cannot find a template for a "' + requestType + '" request.');
-      }
-      
-      // clone the options into request data
-      data = _.defaults(_.clone(opts || {}), defaultOpts);
-      
-      // initialise the request id
-      data.requestId = data.requestId || nextRequestId++;
-      
-      // generate the inner content
-      data.requestName = requestType;
-      data.requestBody = _templates[requestType](data);
-  
-      // create the xml request content
-      xml = _templates.Request(data);
-      dbg('sending request: ' + xml);
-      
-      // create the request args
-      args = {
-          reqID: data.requestId,
-          chunkNo: 1, 
-          numChunks: 1,
-          data: xml,
-          responseFormat: 'JSON'
-      };
-      
-      // specify jsonget opts
-      // the decarta API insists (incorrectly) on a callback so we have to give it one
-      jsonOpts = {
-          forceCallback: true
-      };
-      
-      // make the request
-      jsonget(
-          data.endpoint.replace(reTrailingSlash, '') + '/JSON', 
-          args, 
-          jsonOpts, 
-          function(err, results) {
-              var coreResponse;
-              
-              // extract the core response
-              if (! err) {
-                  coreResponse = extractCoreResponse(requestType, results);
-  
-                  // if we only extracted an error, then map the core response 
-                  // to the error param and the core response back to the complete
-                  // results
-                  if (coreResponse instanceof Error) {
-                      err = coreResponse;
-                      coreResponse = results;
-                  }
-              }
-              
-              callback(err, coreResponse);
-          }
-      );
-  }
-  
-  function queryConfig(opts, callback) {
-      // remap args if required
-      if (typeof opts == 'function') {
-          callback = opts;
-          opts = {};
-      }
-      
-      // initialise default opts
-      // we will need to access this detail later so while the makeRequest function 
-      // injects defaults we will need them here also
-      opts = _.defaults(opts || {}, defaultOpts);
-      
-      handshake(opts, function(err, config) {
-          var aliases, hostName, hosts = [];
-          
-          if (err) {
-              callback(err);
-              return;
-          }
-          
-          aliases = config.maxHostAliases || opts.maxHostAliases;
-          hostName = config.hostName || opts.endpoint.replace(reDetectHost, '$1');
-          
-          // initialise the hosts
-          if (aliases) {
-              for (var ii = 0; ii < aliases; ii++) {
-                  hosts[ii] = 'http://' + hostName.replace(reAlias, '$1-0' + (ii + 1) + '.$2');
-              } // for
-          }
-          else {
-              hosts = ['http://' + hostName];
-          } // if..else
-          
-          callback(null, {
-              hosts: hosts,
-              user: opts.user,
-              sessionId: opts.sessionId,
-              mapConfig: opts.mapConfig
-          });
-      });
-  }
-  
-  function handshake(opts, callback) {
-      // if we have an existing handshake response, then trigger the callback
-      if (handshakeResponse) return callback(null, handshakeResponse);
-  
-      // make the ruokrequest
-      makeRequest('RUOKRequest', opts, function(err, response) {
-          // cache the handshake response
-          if (! err) {
-              handshakeResponse = response;
-          }
-          
-          callback(err, response);
-      });
-  }
-  
-  function template(name) {
-      return _templates[name];
-  }
-  
-  /**
-  # dws
-  This is a JS frontend for the decarta routing engine via their WebServices
-  frontend.
-  
-  ## Configurable Options
-  
-  - mapConfig:            The server map configuration to use (default = global-decarta)
-  - user:                 The username to use for authenticating with the decarta services
-  - apikey:               The api key for authenticating with the decarta services
-  
-  - maxResponses:         (default = 25)
-  - version:              (default = 1.0)
-  - requestId:            The request id (automatically incrementing)
-  - sessionId:            The session id (default = generated)
-  
-  - ddsVersion:           Set to the version of the DDS you are using (default = 4.5.2)
-  - endpoint:             The DDS Webservices endpoint (default: http://ws.decarta.com/openls)
-  */
-  function dws(requestType, opts, callback) {
-      // remap args if required
-      if (typeof opts == 'function') {
-          callback = opts;
-          opts = {};
-      }
-      
-      // initialise a default callback if none provided
-      // TODO: consider returning a promise instead
-      callback = callback || function() {};
-      
-      // check handshake done
-      handshake(opts, function(err, data) {
-          // if we received an error, then fire the callback and return
-          if (err) {
-              callback(err);
-              return;
-          }
-          
-          // TODO: apply the handshake option tweaks
-          makeRequest(requestType, opts, callback);
-      });
-  }
-  
-  // expose the create request and handshake functions
-  dws.addressToXML = addressToXML;
-  dws.configure = configure;
-  dws.makeRequest = makeRequest;
-  dws.queryConfig = queryConfig;
-  dws.handshake = handshake;
-  dws.template = template;
-  
-  // include the other operations
-  /**
-  # dws.geocode(address, opts, callback)
-  
-  ## Configurable Options
-  
-  - provideRouteHandle:   Whether or not a route handle should be returned (default = false)
-  - distanceUnit:         Distance units (default = KM)
-  - routeQueryType:       The type of decarta routing request to make, RMAN, RTXT, etc (default = RMAN)
-  
-  - routePreference:      What type of routing algorithm to use, fastest, shortest, etc (default = fastest)
-  
-  */
-  dws.geocode = function(address, opts, callback) {
-      var waypoints = '';
-  
-      // remap args if required
-      if (typeof opts == 'function') {
-          callback = opts;
-          opts = {};
-      }
-      
-      // create the address xml
-      opts.address = dws.addressToXML(address, opts);
-  
-      // run the request
-      dws('GeocodeRequest', opts, function(err, response) {
-          // if we haven't received an error, make the response more consistent
-          if (! err) {
-              var results = (response.GeocodeResponseList || {}).GeocodedAddress || [];
-              
-              // if the response list is not an array, turn it into one
-              if (! Array.isArray(results)) {
-                  results = [results];
-              }
-              
-              // iterate through the results and normalize the decarta address into a standard format
-              results.forEach(function(result) {
-                  result.address = parseAddress(result.Address);
-                  result.pos = result.Point.pos;
-              });
-  
-              callback(err, results);
-          }
-          else {
-              callback(err);
-          }
-      });
-  };
-  
-  function parseAddress(address, position) {
-      var streetDetails = parseStreet(address.StreetAddress),
-          regions = [];
-  
-      // iterate through the places
-      if (address.Place) {
-          if (! address.Place.length) {
-              address.Place = [address.Place];
-          } // if
-  
-          for (var ii = address.Place.length; ii--; ) {
-              regions[regions.length] = address.Place[ii].content;
-          } // for
-      } // if
-  
-      return {
-          building: streetDetails.building,
-          street: streetDetails.street,
-          regions: regions,
-          countryCode: address.countryCode || '',
-          postalCode: address.PostalCode || '',
-          
-          toString: function() {
-              return [streetDetails.toString()].concat(regions).join(', ');
-          }
-      };
-  } // parseAddress
-  
-  function parseStreet(streetAddress) {
-      // initialise variables
-      var street = "",
-          building = "";
-          
-      // ensure street address contains a value we can work with
-      streetAddress = streetAddress || {};
-          
-      // parse the street
-      if (streetAddress.Street) {
-          street = streetAddress.Street.content ? streetAddress.Street.content : streetAddress.Street;
-      } // if
-  
-      // strip any trailing highway specifiers from the street
-      street = (street && street.replace) ? street.replace(/\/\d+$/, "") : "";
-      
-      // parse the building
-      if (streetAddress.Building) {
-          // TODO: suspect name will be involved here possibly also
-          if (streetAddress.Building.number) {
-              building = streetAddress.Building.number;
-          } // if
-      } // if
-      
-      return {
-          building: building,
-          street: street,
-          
-          /*
-          calcMatchPercentage: function(input) {
-              var fnresult = 0,
-                  test1 = normalize(input), 
-                  test2 = normalize(street);
-                  
-              if (params.json.Building) {
-                  if (buildingMatch(input, params.json.Building.number.toString())) {
-                      fnresult += 0.2;
-                  } // if
-              } // if
-                  
-              if (test1 && test2 && T5.wordExists(test1, test2)) {
-                  fnresult += 0.8;
-              } // if
-  
-              return fnresult;
-          },
-          */
-          
-          toString: function() {
-              return (building ? building + ' ' : '') + street;
-          }
-      };
-  }
-  
-  /**
-  # dws.route(points, opts, callback)
-  
-  ## Configurable Options
-  
-  - provideRouteHandle:   Whether or not a route handle should be returned (default = false)
-  - distanceUnit:         Distance units (default = KM)
-  - routeQueryType:       The type of decarta routing request to make, RMAN, RTXT, etc (default = RMAN)
-  
-  - routePreference:      What type of routing algorithm to use, fastest, shortest, etc (default = fastest)
-  
-  */
-  dws.route = function(points, opts, callback) {
-      var waypoints = '';
-  
-      // remap args if required
-      if (typeof opts == 'function') {
-          callback = opts;
-          opts = {};
-      }
-      
-      // ensure we have options
-      opts = opts || {};
-  
-      // initialise DetermineRouteRequest tag attributes
-      opts.provideRouteHandle = (typeof opts.provideRouteHandle != 'undefined' && opts.provideRouteHandle).toString();
-      opts.distanceUnit = opts.distanceUnit || 'KM';
-      opts.routeQueryType = opts.routeQueryType || 'RMAN';
-  
-      // initialise the route preference option
-      opts.routePreference = opts.routePreference || 'fastest';
-      
-      // initialise instructions and route geometry to return true
-      opts.geometry = typeof opts.geometry == 'undefined' || opts.geometry;
-      
-      // initialise instruction defaults
-      opts.instructions = typeof opts.instructions == 'undefined' || opts.instructions;
-      
-      // create the waypoint tags manually
-      // only need to do this because of the StartPoint, EndPoint, ViaPoint tag names :/
-      for (var ii = 0, count = points.length; ii < count; ii++) {
-          // determine the appropriate tag to use for the waypoint
-          // as to why this is required, who knows....
-          var tagName = (ii === 0 ? "StartPoint" : (ii === count-1 ? "EndPoint" : "ViaPoint"));
-          
-          waypoints += '<xls:' + tagName + '><xls:Position><gml:Point><gml:pos>' + 
-              points[ii].lat + ' ' + points[ii].lon + 
-              '</gml:pos></gml:Point></xls:Position></xls:' + tagName + '>';
-      }
-      
-      // add the the waypoints to the options
-      opts.waypoints = waypoints;
-      
-      // run the request
-      dws('DetermineRouteRequest', opts, function(err, response) {
-          // if we don't have an error, then extract the useful stuff from the response
-          if (! err) {
-              callback(null, {
-                  geometry: response.RouteGeometry.LineString.pos,
-                  instructions: parseInstructions(response.RouteInstructionsList)
-              });
-          }
-          else {
-              callback(err);
-          }
-      });
-  };
-  
-  function parseInstructions(instructionList) {
-      var fnresult = [],
-          instructions = instructionList && instructionList.RouteInstruction ? 
-              instructionList.RouteInstruction : [];
-              
-      for (var ii = 0; ii < instructions.length; ii++) {
-          // initialise the time and duration for this instruction
-          var distance = instructions[ii].distance;
-          
-          fnresult.push({
-              text: instructions[ii].Instruction,
-              latlng: instructions[ii].Point,
-              distance: distance.value + (distance.uom || 'M').toUpperCase(),
-              time: timelord(instructions[ii].duration, '8601')
-          });
-      } // for
-      
-  
-      // T5.log("parsed " + fnresult.length + " instructions", fnresult[0], fnresult[1], fnresult[2]);
-      return fnresult;
-  } // parseInstructions
-  
-  glob.dws = dws;
-  
+   if (typeof dws != 'undefined') glob.dws = dws;
 })(this);

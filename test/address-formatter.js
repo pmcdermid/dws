@@ -1,5 +1,5 @@
 describe('address formatting tests', function() {
-    var dws = require('../pkg/cjs/dws'),
+    var dws = require('../dist/commonjs/dws'),
         expect = require('expect.js'),
         addresses = require('./helpers/testdata').addresses;
         

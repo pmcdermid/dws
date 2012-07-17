@@ -1,4 +1,11 @@
-// req: debug, jsonget, handlebars, async, underscore
+
+var debug = require('debug'),
+    jsonget = require('jsonget'),
+    handlebars = require('handlebars'),
+    async = require('async'),
+    underscore = require('underscore'),
+    timelord = require('timelord');
+
 
 var _templates = {
   'Address': '<xls:Address countryCode="{{ country }}" language="{{ lang }}">{{#if street}}<xls:StreetAddress>{{#if number}}<xls:Building number="{{ number }}"/>{{/if}}<xls:Street>{{ street }}</xls:Street></xls:StreetAddress>{{#each regions}}<xls:Place type="{{ type }}">{{ text }}</xls:Place>{{/each}}{{else}}<xls:freeFormAddress>{{ text }}</xls:freeFormAddress>{{/if}}</xls:Address>',
@@ -436,7 +443,6 @@ function parseStreet(streetAddress) {
         }
     };
 }
-// req: timelord
 
 /**
 # dws.route(points, opts, callback)
@@ -527,3 +533,7 @@ function parseInstructions(instructionList) {
     // T5.log("parsed " + fnresult.length + " instructions", fnresult[0], fnresult[1], fnresult[2]);
     return fnresult;
 } // parseInstructions
+
+if (typeof dws != 'undefined') {
+    module.exports = dws;
+}

@@ -1,5 +1,5 @@
 describe('decarta routing engine tests', function() {
-    var dws = require('../pkg/cjs/dws'),
+    var dws = require('../dist/commonjs/dws'),
         testdata = require('./helpers/testdata'),
         expect = require('expect.js'),
         provider;
