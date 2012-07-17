@@ -40,6 +40,12 @@ var testdata = {
             '<xls:Address countryCode="AU" language="EN"><xls:StreetAddress><xls:Street>WATERFORD RD</xls:Street></xls:StreetAddress><xls:Place type="Municipality">QUEENSLAND</xls:Place></xls:Address>'
         ],
         noresults: true
+    }, {
+        type: 'a single freeform address (street and state format for AU)',
+        input: 'Logan Road, Queensland',
+        output: [
+            '<xls:Address countryCode="US" language="EN"><xls:freeFormAddress>Logan Road, Queensland</xls:freeFormAddress></xls:Address>'
+        ]
     }]
 };
 
