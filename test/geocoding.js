@@ -27,7 +27,7 @@ describe('decarta geocoding tests', function() {
         });
 
         it('should be able to geocode (via proxy): ' + address.type, function(done) {
-            dws.geocode(address.input, { proxy: proxyHost }, function(err, results) {
+            dws.geocode(address.input, { proxy: proxyHost }, function(err, results, res) {
                 if (address.noresults) {
                     expect(err).to.be.ok();
                 }
@@ -37,6 +37,9 @@ describe('decarta geocoding tests', function() {
                     expect(results[0].address).to.be.ok();
                     expect(results[0].pos).to.be.ok();
                     expect(results[0].address.toString()).to.not.equal('[object Object]');
+
+                    // expect the we got the response via a proxy
+                    expect(res.headers.via).to.be.ok();
                 }
                 
                 done(address.noresults ? null : err);

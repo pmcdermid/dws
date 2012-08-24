@@ -160,7 +160,7 @@ function makeRequest(requestType, opts, callback) {
         forceCallback: true,
 
         // pass the proxy configuration onto jsonget
-        proxy: opts.proxy
+        proxy: opts.proxy || defaultOpts.proxy
     };
     
     // make the request
@@ -168,7 +168,7 @@ function makeRequest(requestType, opts, callback) {
         data.endpoint.replace(reTrailingSlash, '') + '/JSON', 
         args, 
         jsonOpts, 
-        function(err, results) {
+        function(err, results, res) {
             var coreResponse;
             
             // extract the core response
@@ -184,7 +184,7 @@ function makeRequest(requestType, opts, callback) {
                 }
             }
             
-            callback(err, coreResponse);
+            callback(err, coreResponse, res);
         }
     );
 }

@@ -168,7 +168,7 @@ define('dws', ['debug', 'jsonget', 'handlebars', 'async', 'underscore', 'timelor
             forceCallback: true,
     
             // pass the proxy configuration onto jsonget
-            proxy: opts.proxy
+            proxy: opts.proxy || defaultOpts.proxy
         };
         
         // make the request
@@ -176,7 +176,7 @@ define('dws', ['debug', 'jsonget', 'handlebars', 'async', 'underscore', 'timelor
             data.endpoint.replace(reTrailingSlash, '') + '/JSON', 
             args, 
             jsonOpts, 
-            function(err, results) {
+            function(err, results, res) {
                 var coreResponse;
                 
                 // extract the core response
@@ -192,7 +192,7 @@ define('dws', ['debug', 'jsonget', 'handlebars', 'async', 'underscore', 'timelor
                     }
                 }
                 
-                callback(err, coreResponse);
+                callback(err, coreResponse, res);
             }
         );
     }
