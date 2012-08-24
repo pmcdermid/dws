@@ -37,7 +37,10 @@ var hbs = typeof Handlebars != 'undefined' ? Handlebars : handlebars,
         rulesFile: 'maneuver-rules',
         
         // initialise server defaults
-        maxHostAliases: 3
+        maxHostAliases: 3,
+
+        // initialise a proxy
+        proxy: undefined
     };
     
 // compile the resources
@@ -154,7 +157,10 @@ function makeRequest(requestType, opts, callback) {
     // specify jsonget opts
     // the decarta API insists (incorrectly) on a callback so we have to give it one
     jsonOpts = {
-        forceCallback: true
+        forceCallback: true,
+
+        // pass the proxy configuration onto jsonget
+        proxy: opts.proxy
     };
     
     // make the request

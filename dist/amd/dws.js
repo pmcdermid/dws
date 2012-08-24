@@ -5,8 +5,8 @@ define('dws', ['debug', 'jsonget', 'handlebars', 'async', 'underscore', 'timelor
       'Address': '<xls:Address countryCode="{{ country }}" language="{{ lang }}">{{#if street}}<xls:StreetAddress>{{#if number}}<xls:Building number="{{ number }}"/>{{/if}}<xls:Street>{{ street }}</xls:Street></xls:StreetAddress>{{#each regions}}<xls:Place type="{{ type }}">{{ text }}</xls:Place>{{/each}}{{else}}<xls:freeFormAddress>{{ text }}</xls:freeFormAddress>{{/if}}</xls:Address>',
       'DetermineRouteRequest': '<xls:DetermineRouteRequest provideRouteHandle="{{ provideRouteHandle }}" distanceUnit="{{ distanceUnit }}" routeQueryType="{{ routeQueryType }}"><xls:RoutePlan><xls:RoutePreference>{{ routePreference }}</xls:RoutePreference><xls:WayPointList>{{{ waypoints }}}</xls:WayPointList></xls:RoutePlan>{{#if instructions}}<xls:RouteInstructionsRequest rules="{{ rulesFile }}" providePoint="true" />{{/if}}{{#if geometry}}<xls:RouteGeometryRequest />{{/if}}</xls:DetermineRouteRequest>',
       'GeocodeRequest': '<xls:GeocodeRequest>{{#each address}}{{{ this }}}{{/each}}</xls:GeocodeRequest>',
-      'Request': '<xls:XLS version="1" xls:lang="en" xmlns:xls="http://www.opengis.net/xls" rel="{{ ddsVersion }}" xmlns:gml="http://www.opengis.net/gml"><xls:RequestHeader clientName="{{ user }}" clientPassword="{{ apikey }}" sessionID="{{ sessionId }}" configuration="{{ mapConfig }}" /><xls:Request maximumResponses="{{ maxResponses }}" version="{{ version }}" requestID="{{ requestId }}" methodName="{{ requestName }}">{{{ requestBody }}}</xls:Request></xls:XLS>',
-      'RUOKRequest': '<xls:RUOKRequest />'
+      'RUOKRequest': '<xls:RUOKRequest />',
+      'Request': '<xls:XLS version="1" xls:lang="en" xmlns:xls="http://www.opengis.net/xls" rel="{{ ddsVersion }}" xmlns:gml="http://www.opengis.net/gml"><xls:RequestHeader clientName="{{ user }}" clientPassword="{{ apikey }}" sessionID="{{ sessionId }}" configuration="{{ mapConfig }}" /><xls:Request maximumResponses="{{ maxResponses }}" version="{{ version }}" requestID="{{ requestId }}" methodName="{{ requestName }}">{{{ requestBody }}}</xls:Request></xls:XLS>'
     };
     
     
@@ -45,7 +45,10 @@ define('dws', ['debug', 'jsonget', 'handlebars', 'async', 'underscore', 'timelor
             rulesFile: 'maneuver-rules',
             
             // initialise server defaults
-            maxHostAliases: 3
+            maxHostAliases: 3,
+    
+            // initialise a proxy
+            proxy: undefined
         };
         
     // compile the resources
@@ -162,7 +165,10 @@ define('dws', ['debug', 'jsonget', 'handlebars', 'async', 'underscore', 'timelor
         // specify jsonget opts
         // the decarta API insists (incorrectly) on a callback so we have to give it one
         jsonOpts = {
-            forceCallback: true
+            forceCallback: true,
+    
+            // pass the proxy configuration onto jsonget
+            proxy: opts.proxy
         };
         
         // make the request
