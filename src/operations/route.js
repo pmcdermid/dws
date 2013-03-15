@@ -53,6 +53,9 @@ dws.route = function(points, opts, callback) {
     // add the the waypoints to the options
     opts.waypoints = waypoints;
     
+    // add the avoid features
+    opts.avoid = opts.avoid || [];
+    
     // run the request
     dws('DetermineRouteRequest', opts, function(err, response) {
         // if we don't have an error, then extract the useful stuff from the response
