@@ -6,8 +6,11 @@
     <xls:RoutePlan>
         <xls:RoutePreference>{{ routePreference }}</xls:RoutePreference>
         <xls:WayPointList>{{{ waypoints }}}</xls:WayPointList>
+        <xls:AvoidList>
+          {{#each avoid}}<xls:AvoidFeature>{{ this }}</xls:AvoidFeature>{{/each}}
+        </xls:AvoidList>
     </xls:RoutePlan>
-    
+
     {{#if instructions}}<xls:RouteInstructionsRequest rules="{{ rulesFile }}" providePoint="true" />{{/if}}
     {{#if geometry}}<xls:RouteGeometryRequest />{{/if}}
 </xls:DetermineRouteRequest>
